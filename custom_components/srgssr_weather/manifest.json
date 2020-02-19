@@ -1,0 +1,10 @@
+{
+  "domain": "srgssr_weather",
+  "name": "SRG SSR Weather",
+  "config_flow": true,
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": [
+    "siku2"
+  ]
+}

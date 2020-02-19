@@ -1,0 +1,32 @@
+{
+  "config": {
+    "error": {
+      "name_exists": "Location already exists"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "elevation": "Elevation",
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "name": "Name"
+        },
+        "description": "",
+        "title": "Location"
+      }
+    },
+    "title": "SRG SSR Weather"
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "api_key": "API key"
+        },
+        "description": "",
+        "title": "API Settings"
+      }
+    },
+    "title": "SRG SSR Weather"
+  }
+}
