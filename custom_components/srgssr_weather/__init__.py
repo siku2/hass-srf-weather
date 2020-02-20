@@ -18,6 +18,7 @@ CONFIG_SCHEMA = vol.Schema({
 }, extra=vol.ALLOW_EXTRA)
 
 
+# TODO configure in UI
 async def async_setup(hass: HomeAssistantType, config: ConfigType) -> bool:
     try:
         integ_config = config[DOMAIN]
