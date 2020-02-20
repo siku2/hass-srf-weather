@@ -6,7 +6,6 @@
     "step": {
       "user": {
         "data": {
-          "elevation": "Elevation",
           "latitude": "Latitude",
           "longitude": "Longitude",
           "name": "Name"
