@@ -4,17 +4,13 @@ Integration to get weather forecasts from SRF Meteo using the SRG SSR Weather AP
 
 ## Configuration
 
-You need to add the following to your `configuration.yaml`.
-After adding these settings and restarting Home Assistant you can head over to `Configuration > Integrations` and setup the integration.
+Head over to `Configuration > Integrations` to set the integration up.
 Press the plus button and search for "SRG SSR Weather".
 
-```yaml
-srgssr_weather:
-  consumer_key: CONSUMER KEY
-  consumer_secret: CONSUMER SECRET
-```
+The first step will ask you for API credentials, refer to the next section for 
+instructions on how to get them.
 
-### How to get these keys
+### How to get the API Credentials
 
 Go to https://developer.srgssr.ch and create a new account (or login with your existing one).
 

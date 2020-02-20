@@ -1,7 +1,8 @@
 {
   "config": {
     "error": {
-      "name_exists": "Location already exists"
+      "location_exists": "Location already exists",
+      "invalid_credentials": "Invalid credentials"
     },
     "step": {
       "user": {
@@ -10,20 +11,16 @@
           "longitude": "Longitude",
           "name": "Name"
         },
-        "description": "",
+        "description": "Location to provide weather for",
         "title": "Location"
-      }
-    },
-    "title": "SRG SSR Weather"
-  },
-  "options": {
-    "step": {
-      "init": {
+      },
+      "credentials": {
         "data": {
-          "api_key": "API key"
+          "consumer_key": "Consumer Key",
+          "consumer_secret": "Consumer Secret"
         },
-        "description": "",
-        "title": "API Settings"
+        "description": "Please provide the app credentials from https://developer.srgssr.ch/user/me/apps",
+        "title": "API Setup"
       }
     },
     "title": "SRG SSR Weather"

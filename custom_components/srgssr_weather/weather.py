@@ -12,7 +12,7 @@ from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME, TEMP_C
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import HomeAssistantType
 
-from .const import ATTR_API_KEY, ATTR_EXPIRES_AT, CONF_CONSUMER_KEY, CONF_CONSUMER_SECRET, DATA_API_KEY
+from .const import ATTR_API_KEY, ATTR_EXPIRES_AT, CONF_CONSUMER_KEY, CONF_CONSUMER_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -40,16 +40,14 @@ async def request_access_token(hass: HomeAssistantType, key: str, secret: str) -
         return await resp.json()
 
 
-async def _renew_api_key(hass: HomeAssistantType, data: dict) -> None:
+async def _renew_api_key(hass: HomeAssistantType, data: MutableMapping) -> None:
     token_data = await request_access_token(hass, data[CONF_CONSUMER_KEY], data[CONF_CONSUMER_SECRET])
 
-    data[ATTR_EXPIRES_AT] = int(token_data["expires_in"]) + int(token_data["issued_at"]) / 1000
+    data[ATTR_EXPIRES_AT] = int(token_data["expires_in"]) + int(token_data["issued_at"]) // 1000
     data[ATTR_API_KEY] = token_data["access_token"]
 
 
-async def get_api_key(hass: HomeAssistantType) -> str:
-    data = hass.data[DATA_API_KEY]
-
+async def get_api_key(hass: HomeAssistantType, data: MutableMapping) -> str:
     try:
         expires_at = data[ATTR_EXPIRES_AT]
     except KeyError:
@@ -76,9 +74,6 @@ class SRGSSTWeather(WeatherEntity):
         self._forecast = []
         self._state = None
         self._temperature = None
-        self._pressure = None
-        self._humidity = None
-        self._visibility = None
         self._wind_speed = None
         self._wind_bearing = None
 
@@ -114,15 +109,15 @@ class SRGSSTWeather(WeatherEntity):
 
     @property
     def pressure(self) -> Optional[float]:
-        return self._pressure
+        return None
 
     @property
     def humidity(self) -> Optional[float]:
-        return self._humidity
+        return None
 
     @property
     def visibility(self) -> Optional[float]:
-        return self._visibility
+        return None
 
     @property
     def wind_speed(self) -> Optional[float]:
@@ -142,7 +137,7 @@ class SRGSSTWeather(WeatherEntity):
 
     async def __get(self, url: str, **kwargs) -> dict:
         session = async_get_clientsession(self.hass)
-        api_key = await get_api_key(self.hass)
+        api_key = await get_api_key(self.hass, self._config)
         weak_update(kwargs, "headers", {
             "Authorization": f"Bearer {api_key}",
         })
@@ -202,10 +197,10 @@ class SRGSSTWeather(WeatherEntity):
             delay = random.randrange(55, 65) * 60
             await asyncio.sleep(delay)
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         self.__update_loop_task = asyncio.create_task(self.__update_loop())
 
-    async def will_remove_from_hass(self):
+    async def async_will_remove_from_hass(self) -> None:
         if self.__update_loop_task:
             self.__update_loop_task.cancel()
             self.__update_loop_task = None
