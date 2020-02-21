@@ -9,7 +9,7 @@ Follow the installation instructions shown in HACS or read the [info](info.md) f
 
 1. Go to the HACS Settings and add the custom repository `siku2/hass-weather-srgssr` with category "Integration".
 2. Open the "Integrations" tab and search for "SRG SSR Weather".
-3. Follow the instructions there to install and setup the integration.
+3. Follow the instructions there to set the integration up.
 
 ## Limitations
 

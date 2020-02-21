@@ -155,9 +155,11 @@ class SRGSSTWeather(WeatherEntity):
         self._wind_speed = float(forecast["fff"])
         self._wind_speed = float(forecast["ffx3"])
         # their wind direction points in the direction the wind is flowing
-        self._wind_bearing = deg_to_cardinal(float(forecast["ddd"]) + DEG_HALF_CIRCLE)
+        wind_bearing_deg = (float(forecast["ddd"]) + DEG_HALF_CIRCLE) % DEG_FULL_CIRCLE
+        self._wind_bearing = deg_to_cardinal(wind_bearing_deg)
 
         self._state_attrs.update(
+            wind_direction=wind_bearing_deg,
             precipitation=float(forecast["rr3"]),
             rain_probability=float(forecast["pr3"]),
         )
