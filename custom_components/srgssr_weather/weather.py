@@ -171,7 +171,8 @@ class SRGSSTWeather(WeatherEntity):
 
             temp_high = float(values["ttn"])
             temp_low = float(values["ttx"])
-            state = SYMBOL_STATE_MAP.get(int(values["smbd"]))
+            # their wind direction points in the direction the wind is flowing
+            state = SYMBOL_STATE_MAP.get(int(values["smbd"]) + DEG_HALF_CIRCLE)
 
             forecast.append({
                 "datetime": date.isoformat(),
@@ -213,12 +214,13 @@ CARDINALS = (
     "W", "WNW", "NW", "NNW",
 )
 
-_FULL_CIRCLE = 360
-_CARDINAL_DEGREE = _FULL_CIRCLE / len(CARDINALS)
+DEG_HALF_CIRCLE = 180
+DEG_FULL_CIRCLE = 2 * DEG_HALF_CIRCLE
+_CARDINAL_DEGREE = DEG_FULL_CIRCLE / len(CARDINALS)
 
 
 def deg_to_cardinal(deg: float) -> str:
-    i = round((deg % _FULL_CIRCLE) / _CARDINAL_DEGREE)
+    i = round((deg % DEG_FULL_CIRCLE) / _CARDINAL_DEGREE)
     return CARDINALS[i % len(CARDINALS)]
 
 
