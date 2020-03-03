@@ -229,10 +229,13 @@ def deg_to_cardinal(deg: float) -> str:
     return CARDINALS[i % len(CARDINALS)]
 
 
+# maps the symbol reported by the API to the Material Design icon names used by Home Assistant.
+# Sadly this isn't bijective because the API reports lots of weirdly specific states.
+# The comments contain the description of each symbol id as reported by SRG SSR.
 SYMBOL_STATE_MAP = {
     1: "sunny",  # sonnig
     2: "sunny",  # Sonne und Nebelbänke
-    3: "windy-variant",  # Sonne und Wolken im Wechsel
+    3: "partlycloudy",  # Sonne und Wolken im Wechsel
     4: "sunny",  # teils sonnig, teils Schauer
     5: "lightning",  # sonnige Abschnitte und einige Gewitter
     6: "sunny",  # teils sonnig, einzelne Schneeschauer
@@ -254,13 +257,13 @@ SYMBOL_STATE_MAP = {
     22: "snowy-rainy",  # Regen, zeitweise auch mit Flocken
     23: "pouring",  # Dauerregen
     24: "snowy",  # starker Schneefall
-    25: "windy",  # trockene Phasen und Schauer im Wechsel
+    25: "rainy",  # trockene Phasen und Schauer im Wechsel
     26: "lightning",  # stark bewölkt und einige Gewitter
     27: "snowy",  # trüb mit einigen Schneeschauern
     28: "cloudy",  # stark bewölkt, Schneeschauer, dazwischen Blitz und Donner
     29: "snowy-rainy",  # ab und zu Schneeregen
     30: "snowy-rainy",  # Schneeregen, einzelne Gewitter
-    -1: "clear-night",  # klar
+    -1: "sunny",  # klar
     -2: "partlycloudy",  # klar mit ein paar Nebelbänken
     -3: "sunny",  # ab und zu Wolken
     -4: "rainy",  # einige Schauer
