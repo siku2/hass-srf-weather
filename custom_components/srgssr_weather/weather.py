@@ -150,16 +150,17 @@ class SRGSSTWeather(WeatherEntity):
 
         forecast = merge_mappings(data["nexthour"][0]["values"])
 
-        self._state = SYMBOL_STATE_MAP.get(int(forecast["smb3"]))
+        symbol_id = int(forecast["smb3"])
+        self._state = SYMBOL_STATE_MAP.get(symbol_id)
         self._temperature = float(forecast["ttt"])
         self._wind_speed = float(forecast["fff"])
         self._wind_speed = float(forecast["ffx3"])
-        # their wind direction points in the direction the wind is flowing
-        wind_bearing_deg = (float(forecast["ddd"]) + DEG_HALF_CIRCLE) % DEG_FULL_CIRCLE
+        wind_bearing_deg = float(forecast["ddd"])
         self._wind_bearing = deg_to_cardinal(wind_bearing_deg)
 
         self._state_attrs.update(
             wind_direction=wind_bearing_deg,
+            symbol_id=symbol_id,
             precipitation=float(forecast["rr3"]),
             rain_probability=float(forecast["pr3"]),
         )
@@ -174,12 +175,14 @@ class SRGSSTWeather(WeatherEntity):
 
             temp_high = float(values["ttn"])
             temp_low = float(values["ttx"])
-            state = SYMBOL_STATE_MAP.get(int(values["smbd"]))
+            symbol_id = int(values["smbd"])
+            state = SYMBOL_STATE_MAP.get(symbol_id)
 
             forecast.append({
                 "datetime": date.isoformat(),
                 "temperature": temp_high,
                 "condition": state,
+                "symbol_id": symbol_id,
                 "templow": temp_low,
             })
 
