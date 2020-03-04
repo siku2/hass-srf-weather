@@ -173,8 +173,8 @@ class SRGSSTWeather(WeatherEntity):
             date = datetime.strptime(day["date"], "%Y-%m-%d")
             values = merge_mappings(day["values"])
 
-            temp_high = float(values["ttn"])
-            temp_low = float(values["ttx"])
+            temp_high = float(values["ttx"])
+            temp_low = float(values["ttn"])
             symbol_id = int(values["smbd"])
             state = SYMBOL_STATE_MAP.get(symbol_id)
 
