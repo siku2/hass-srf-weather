@@ -69,6 +69,7 @@ class SRGSSTWeather(WeatherEntity):
             "latitude": str(config[CONF_LATITUDE]),
             "longitude": str(config[CONF_LONGITUDE]),
         }
+        self._api_data = dict(self._config)
         self.__update_loop_task = None
 
         self._forecast = []
@@ -137,7 +138,7 @@ class SRGSSTWeather(WeatherEntity):
 
     async def __get(self, url: str, **kwargs) -> dict:
         session = async_get_clientsession(self.hass)
-        api_key = await get_api_key(self.hass, self._config)
+        api_key = await get_api_key(self.hass, self._api_data)
         weak_update(kwargs, "headers", {
             "Authorization": f"Bearer {api_key}",
         })
