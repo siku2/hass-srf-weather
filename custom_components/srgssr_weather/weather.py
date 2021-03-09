@@ -43,8 +43,12 @@ async def request_access_token(hass: HomeAssistantType, key: str, secret: str) -
 async def _renew_api_key(hass: HomeAssistantType, data: MutableMapping) -> None:
     token_data = await request_access_token(hass, data[CONF_CONSUMER_KEY], data[CONF_CONSUMER_SECRET])
 
-    data[ATTR_EXPIRES_AT] = int(token_data["expires_in"]) + int(token_data["issued_at"]) // 1000
-    data[ATTR_API_KEY] = token_data["access_token"]
+    try:
+        data[ATTR_EXPIRES_AT] = int(token_data["expires_in"]) + int(token_data["issued_at"]) // 1000
+        data[ATTR_API_KEY] = token_data["access_token"]
+    except Exception:
+        logger.exception("exception while parsing access token response: %s", token_data)
+        raise
 
 
 async def get_api_key(hass: HomeAssistantType, data: MutableMapping) -> str:
