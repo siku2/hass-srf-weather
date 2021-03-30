@@ -12,12 +12,19 @@ from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME, TEMP_C
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import HomeAssistantType
 
-from .const import ATTR_API_KEY, ATTR_EXPIRES_AT, CONF_CONSUMER_KEY, CONF_CONSUMER_SECRET
+from .const import (
+    ATTR_API_KEY,
+    ATTR_EXPIRES_AT,
+    CONF_CONSUMER_KEY,
+    CONF_CONSUMER_SECRET,
+)
 
 logger = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistantType, config_entry: ConfigEntry, async_add_entities) -> None:
+async def async_setup_entry(
+    hass: HomeAssistantType, config_entry: ConfigEntry, async_add_entities
+) -> None:
     async_add_entities((SRGSSTWeather(config_entry.data),))
 
 
@@ -30,6 +37,20 @@ URL_HOUR_FORECAST_BY_ID = URL_FORECASTS + "/nexthour"
 URL_WEEKS_FORECAST_BY_ID = URL_FORECASTS + "/7day"
 
 
+def _check_client_credentials_response(d: dict) -> None:
+    EXPECTED_KEYS = {"issued_at", "expires_in", "access_token"}
+
+    if "issued_at" not in d:
+        d["issued_at"] = int(time.time())
+
+    missing = EXPECTED_KEYS - d.keys()
+    if missing:
+        logger.warning(
+            f"received client credentials response with missing keys: {missing} ({d})"
+        )
+        raise ValueError("client credentials response missing keys", missing)
+
+
 async def request_access_token(hass: HomeAssistantType, key: str, secret: str) -> dict:
     session = async_get_clientsession(hass)
 
@@ -37,17 +58,27 @@ async def request_access_token(hass: HomeAssistantType, key: str, secret: str) -
     headers = {"Authorization": f"Basic {auth}"}
     params = {"grant_type": "client_credentials"}
     async with session.post(URL_OAUTH, params=params, headers=headers) as resp:
-        return await resp.json()
+        data = await resp.json()
+
+    _check_client_credentials_response(data)
+    return data
 
 
 async def _renew_api_key(hass: HomeAssistantType, data: MutableMapping) -> None:
-    token_data = await request_access_token(hass, data[CONF_CONSUMER_KEY], data[CONF_CONSUMER_SECRET])
+    token_data = await request_access_token(
+        hass, data[CONF_CONSUMER_KEY], data[CONF_CONSUMER_SECRET]
+    )
+    logger.debug("token data: %s", token_data)
 
     try:
-        data[ATTR_EXPIRES_AT] = int(token_data["expires_in"]) + int(token_data["issued_at"]) // 1000
+        data[ATTR_EXPIRES_AT] = (
+            int(token_data["expires_in"]) + int(token_data["issued_at"]) // 1000
+        )
         data[ATTR_API_KEY] = token_data["access_token"]
     except Exception:
-        logger.exception("exception while parsing access token response: %s", token_data)
+        logger.exception(
+            "exception while parsing access token response: %s", token_data
+        )
         raise
 
 
@@ -143,12 +174,21 @@ class SRGSSTWeather(WeatherEntity):
     async def __get(self, url: str, **kwargs) -> dict:
         session = async_get_clientsession(self.hass)
         api_key = await get_api_key(self.hass, self._api_data)
-        weak_update(kwargs, "headers", {
-            "Authorization": f"Bearer {api_key}",
-        })
+        weak_update(
+            kwargs,
+            "headers",
+            {
+                "Authorization": f"Bearer {api_key}",
+            },
+        )
         weak_update(kwargs, "params", self._default_params)
+        logger.debug("GET %s with %s", url, kwargs)
         async with session.get(url, **kwargs) as resp:
-            return await resp.json()
+            data = await resp.json()
+            logger.debug("response: %s", data)
+            resp.raise_for_status()
+
+        return data
 
     async def __update_current(self) -> None:
         data = await self.__get(URL_HOUR_FORECAST_BY_ID)
@@ -174,22 +214,13 @@ class SRGSSTWeather(WeatherEntity):
         data = await self.__get(URL_WEEKS_FORECAST_BY_ID)
 
         forecast = []
-        for day in data["7days"]:
-            date = datetime.strptime(day["date"], "%Y-%m-%d")
-            values = merge_mappings(day["values"])
-
-            temp_high = float(values["ttx"])
-            temp_low = float(values["ttn"])
-            symbol_id = int(values["smbd"])
-            state = SYMBOL_STATE_MAP.get(symbol_id)
-
-            forecast.append({
-                "datetime": date.isoformat(),
-                "temperature": temp_high,
-                "condition": state,
-                "symbol_id": symbol_id,
-                "templow": temp_low,
-            })
+        for raw_day in data["7days"]:
+            try:
+                day = parse_forecast_day(raw_day)
+            except Exception:
+                logger.warning(f"failed to parse forecast day: {raw_day}")
+                continue
+            forecast.append(day)
 
         self._forecast = forecast
 
@@ -217,11 +248,41 @@ class SRGSSTWeather(WeatherEntity):
             self.__update_loop_task = None
 
 
+def parse_forecast_day(day: dict) -> dict:
+    date = datetime.strptime(day["date"], "%Y-%m-%d")
+    values = merge_mappings(day["values"])
+
+    temp_high = float(values["ttx"])
+    temp_low = float(values["ttn"])
+    symbol_id = int(values["smbd"])
+    state = SYMBOL_STATE_MAP.get(symbol_id)
+
+    return {
+        "datetime": date.isoformat(),
+        "temperature": temp_high,
+        "condition": state,
+        "symbol_id": symbol_id,
+        "templow": temp_low,
+    }
+
+
 CARDINALS = (
-    "N", "NNE", "NE", "ENE",
-    "E", "ESE", "SE", "SSE",
-    "S", "SSW", "SW", "WSW",
-    "W", "WNW", "NW", "NNW",
+    "N",
+    "NNE",
+    "NE",
+    "ENE",
+    "E",
+    "ESE",
+    "SE",
+    "SSE",
+    "S",
+    "SSW",
+    "SW",
+    "WSW",
+    "W",
+    "WNW",
+    "NW",
+    "NNW",
 )
 
 DEG_HALF_CIRCLE = 180
