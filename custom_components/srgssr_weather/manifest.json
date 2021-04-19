@@ -1,6 +1,7 @@
 {
   "domain": "srgssr_weather",
   "name": "SRG SSR Weather",
+  "version": "1.1.3",
   "config_flow": true,
   "requirements": [],
   "dependencies": [],
