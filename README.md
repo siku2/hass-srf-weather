@@ -1,5 +1,7 @@
 # Home Assistant SRG SSR Weather integration
 
+> IMPORTANT: The API has been deprecated in favour of a different one and I haven't updated yet. As such, this integration doesn't currently work!
+
 Brings [SRF Meteo](https://www.srf.ch/meteo) weather forecasts to your Home Assistant.
 
 Note that the SRG SSR APIs require a developer account.
