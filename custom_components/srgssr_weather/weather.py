@@ -4,13 +4,12 @@ import logging
 import random
 import time
 from datetime import datetime
-from typing import Iterable, List, Mapping, MutableMapping, Optional
+from typing import List, MutableMapping, Optional
+from itertools import islice
 
 from homeassistant.components.weather import WeatherEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    CONF_LATITUDE,
-    CONF_LONGITUDE,
     CONF_NAME,
     HTTP_OK,
     TEMP_CELSIUS,
@@ -227,7 +226,7 @@ class SRGSSTWeather(WeatherEntity):
             for f in hourly_forecast
             if datetime.fromisoformat(f["local_date_time"]) > now
         )
-        forecastnow = next(futureforecast, None)
+        forecastnow = next(future_hourly_forecast, None)
         if forecastnow is None:
             logger.warning("No forecast found for current hour {}".format(now))
             forecastnow = future_hourly_forecast[-1]
@@ -255,7 +254,7 @@ class SRGSSTWeather(WeatherEntity):
         self._forecast = forecast
 
         hourly_forecast = []
-        for raw_hour in future_hourly_forecast:
+        for raw_hour in islice(future_hourly_forecast, 24):
             try:
                 hour = parse_forecast_hour(raw_hour)
             except Exception as e:
