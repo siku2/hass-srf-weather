@@ -1,8 +1,9 @@
 {
   "config": {
     "error": {
-      "location_exists": "Location already exists",
-      "invalid_credentials": "Invalid credentials"
+      "geolocation_exists": "Location exists already",
+      "invalid_credentials": "Invalid credentials",
+      "no_geolocation_found": "No geolocation found"
     },
     "step": {
       "user": {
@@ -21,6 +22,13 @@
         },
         "description": "Please provide the app credentials from https://developer.srgssr.ch/user/me/apps",
         "title": "API Setup"
+      },
+      "geolocationid": {
+        "data": {
+          "geolocation_id": "Location"
+        },
+        "description": "Closest available weather locations",
+        "title": "Location choice"
       }
     },
     "title": "SRG SSR Weather"
