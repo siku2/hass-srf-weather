@@ -17,7 +17,7 @@ Go to <https://developer.srgssr.ch> and create a new account (or login with your
 Open [My Apps](https://developer.srgssr.ch/user/me/apps) and press "ADD A NEW APP".
 
 Give the app a name like "Home Assistant" (the name is irrelevant).
-Make sure that the Product is set to "SRG-SSR-PUBLIC-API-V2".
+Make sure that the Product is set to a SRF-MeteoProduct, e.g. "SRF-MeteoProductFreemium".
 All other options may be left at their default value.
 
 Open the "Info" tab of the app you just created and find both keys in the "Keys" column.
