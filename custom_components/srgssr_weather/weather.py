@@ -8,7 +8,14 @@ from typing import Iterable, List, Mapping, MutableMapping, Optional
 
 from homeassistant.components.weather import WeatherEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME, TEMP_CELSIUS
+from homeassistant.const import (
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    CONF_NAME,
+    HTTP_OK,
+    TEMP_CELSIUS,
+    STATE_UNAVAILABLE,
+)
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import HomeAssistantType
 
@@ -32,9 +39,7 @@ API_URL = "https://api.srgssr.ch"
 
 URL_OAUTH = API_URL + "/oauth/v1/accesstoken"
 
-URL_FORECASTS = API_URL + "/forecasts/v1.0/weather"
-URL_HOUR_FORECAST_BY_ID = URL_FORECASTS + "/nexthour"
-URL_WEEKS_FORECAST_BY_ID = URL_FORECASTS + "/7day"
+URL_FORECASTS = API_URL + "/srf-meteo/forecast/{geolocationId}"
 
 
 def _check_client_credentials_response(d: dict) -> None:
@@ -108,6 +113,7 @@ class SRGSSTWeather(WeatherEntity):
         self.__update_loop_task = None
 
         self._forecast = []
+        self._hourly_forecast = []
         self._state = None
         self._temperature = None
         self._wind_speed = None
@@ -168,6 +174,10 @@ class SRGSSTWeather(WeatherEntity):
         return self._forecast
 
     @property
+    def hourly_forecast(self) -> List[dict]:
+        return self._hourly_forecast
+
+    @property
     def attribution(self) -> str:
         return "SRF Schweizer Radio und Fernsehen"
 
@@ -181,42 +191,66 @@ class SRGSSTWeather(WeatherEntity):
                 "Authorization": f"Bearer {api_key}",
             },
         )
-        weak_update(kwargs, "params", self._default_params)
+        # weak_update(kwargs, "params", self._default_params)
         logger.debug("GET %s with %s", url, kwargs)
         async with session.get(url, **kwargs) as resp:
+            if resp.status == HTTP_OK:
+                logger.debug(
+                    "Rate-limit available %s, rate-limit reset will be on %s",
+                    resp.headers.get("x-ratelimit-available"),
+                    datetime.fromtimestamp(
+                        int(resp.headers.get("x-ratelimit-reset-time", 0)) / 1000
+                    ),
+                )
             data = await resp.json()
             logger.debug("response: %s", data)
             resp.raise_for_status()
 
         return data
 
-    async def __update_current(self) -> None:
-        data = await self.__get(URL_HOUR_FORECAST_BY_ID)
+    async def __update(self) -> None:
+        geoid = "{},{}".format(
+            self._default_params["latitude"], self._default_params["longitude"]
+        )
+        url = URL_FORECASTS.format(geolocationId="47.0274,8.3020")
+        logger.debug("Updating using URL %s", url)
+        data = await self.__get(url)
 
-        forecast = merge_mappings(data["nexthour"][0]["values"])
+        logger.debug(data)
+        hourlyforecast = data["forecast"]["60minutes"]
 
-        symbol_id = int(forecast["smb3"])
-        self._state = SYMBOL_STATE_MAP.get(symbol_id)
-        self._temperature = float(forecast["ttt"])
-        self._wind_speed = float(forecast["fff"])
-        self._wind_speed = float(forecast["ffx3"])
-        wind_bearing_deg = float(forecast["ddd"])
+        now = datetime.now().astimezone()
+        futureforecast = (
+            f
+            for f in hourlyforecast
+            if datetime.fromisoformat(f["local_date_time"]) > now
+        )
+        forecastnow = next(futureforecast, None)
+        if forecastnow is None:
+            logger.warning("No forecast found for current hour {}".format(now))
+            forecastnow = hourlyforecast[-1]
+
+        logger.debug(forecastnow)
+
+        symbol_id = int(forecastnow["SYMBOL_CODE"])
+        self._state = get_condition_from_symbol(symbol_id)
+        self._temperature = float(forecastnow["TTT_C"])
+        self._wind_speed = float(forecastnow["FF_KMH"])
+        self._wind_speed = float(forecastnow["FX_KMH"])
+        wind_bearing_deg = float(forecastnow["DD_DEG"])
         self._wind_bearing = deg_to_cardinal(wind_bearing_deg)
 
         self._state_attrs.update(
             wind_direction=wind_bearing_deg,
             symbol_id=symbol_id,
-            precipitation=float(forecast["rr3"]),
-            rain_probability=float(forecast["pr3"]),
+            precipitation=float(forecastnow["RRR_MM"]),
+            rain_probability=float(forecastnow["PROBPCP_PERCENT"]),
         )
 
-    async def __update_forecast(self) -> None:
-        data = await self.__get(URL_WEEKS_FORECAST_BY_ID)
-
         forecast = []
-        for raw_day in data["7days"]:
+        for raw_day in data["forecast"]["day"]:
             try:
-                day = parse_forecast_day(raw_day)
+                day = parse_forecast(raw_day)
             except Exception:
                 logger.warning(f"failed to parse forecast day: {raw_day}")
                 continue
@@ -224,11 +258,20 @@ class SRGSSTWeather(WeatherEntity):
 
         self._forecast = forecast
 
+        hourly_forecast = []
+        for raw_hour in data["forecast"]["60minutes"]:
+            try:
+                hour = parse_forecast(raw_hour)
+            except Exception:
+                logger.warning(f"failed to parse forecast day: {raw_hour}")
+                continue
+            forecast.append(hour)
+        self._hourly_forecast = hourly_forecast
+
     async def __update_loop(self) -> None:
         while True:
             try:
-                await self.__update_current()
-                await self.__update_forecast()
+                await self.__update()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -248,21 +291,26 @@ class SRGSSTWeather(WeatherEntity):
             self.__update_loop_task = None
 
 
-def parse_forecast_day(day: dict) -> dict:
-    date = datetime.strptime(day["date"], "%Y-%m-%d")
-    values = merge_mappings(day["values"])
+def parse_forecast(day: dict) -> dict:
+    date = datetime.fromisoformat(day["local_date_time"])
 
-    temp_high = float(values["ttx"])
-    temp_low = float(values["ttn"])
-    symbol_id = int(values["smbd"])
-    state = SYMBOL_STATE_MAP.get(symbol_id)
+    temp_high = float(day["TX_C"])
+    temp_low = float(day["TN_C"])
+    symbol_id = int(day["SYMBOL_CODE"])
+    condition = get_condition_from_symbol(symbol_id)
+    precip_total = float(day["RRR_MM"])
+    wind_bearing = int(day["DD_DEG"])
+    wind_speed = float(day["FF_KMH"])
 
     return {
         "datetime": date.isoformat(),
         "temperature": temp_high,
-        "condition": state,
+        "condition": condition,
         "symbol_id": symbol_id,
         "templow": temp_low,
+        "precipitation": precip_total,
+        "wind_bearing": precip_total,
+        "wind_speed": wind_speed,
     }
 
 
@@ -300,73 +348,74 @@ def deg_to_cardinal(deg: float) -> str:
 # The comments contain the description of each symbol id as reported by SRG SSR.
 SYMBOL_STATE_MAP = {
     1: "sunny",  # sonnig
-    2: "sunny",  # Sonne und Nebelbänke
-    3: "partlycloudy",  # Sonne und Wolken im Wechsel
-    4: "sunny",  # teils sonnig, teils Schauer
-    5: "lightning",  # sonnige Abschnitte und einige Gewitter
-    6: "sunny",  # teils sonnig, einzelne Schneeschauer
-    7: "snowy-rainy",  # sonnige Abschnitte und einige Gewitter mit Schnee
-    8: "snowy-rainy",  # sonnige Abschnitte und Schneeregenschauer
-    9: "snowy-rainy",  # wechselhaft mit Schneeregenschauern und Gewittern
-    10: "partlycloudy",  # ziemlich sonnig
-    11: "sunny",  # sonnig, aber auch einzelne Schauer
-    12: "sunny",  # sonnig und nur einzelne Gewitter
-    13: "sunny",  # sonnig und nur einzelne Schneeschauer
-    14: "sunny",  # sonnig, einzelne Schneeschauer, dazwischen sogar Blitz und Donner
-    15: "sunny",  # sonnig und nur einzelne Schauer, vereinzelt auch Flocken
-    16: "sunny",  # oft sonnig, nur einzelne gewittrige Schauer, teils auch Flocken
+    2: "fog",  # Nebelbänke
+    3: "partlycloudy",  # teils sonnig
+    4: "rainy",  # Regenschauer
+    5: "lightning-rainy",  # Regenegenschauer mit Gewitter
+    6: "snowy",  # Schneeschauer
+    7: "snowy-rainy",  # sonnige Abschnitte und einige Gewitter mit Schnee (undocumented)
+    8: "snowy-rainy",  # Schneeregenschauer
+    9: "snowy-rainy",  # wechselhaft mit Schneeregenschauern und Gewittern (undocumented)
+    10: "sunny",  # ziemlich sonnig
+    11: "sunny",  # sonnig, aber auch einzelne Schauer (undocumented)
+    12: "sunny",  # sonnig und nur einzelne Gewitter (undocumented)
+    13: "sunny",  # sonnig und nur einzelne Schneeschauer (undocumented)
+    14: "sunny",  # sonnig, einzelne Schneeschauer, dazwischen sogar Blitz und Donner (undocumented)
+    15: "sunny",  # sonnig und nur einzelne Schauer, vereinzelt auch Flocken (undocumented)
+    16: "sunny",  # oft sonnig, nur einzelne gewittrige Schauer, teils auch Flocken (undocumented)
     17: "fog",  # Nebel
-    18: "cloudy",  # stark bewölkt
+    18: "cloudy",  # stark bewölkt (undocumented)
     19: "cloudy",  # bedeckt
     20: "rainy",  # regnerisch
-    21: "snowy",  # stark bewölkt mit Schnee
-    22: "snowy-rainy",  # Regen, zeitweise auch mit Flocken
-    23: "pouring",  # Dauerregen
-    24: "snowy",  # starker Schneefall
-    25: "rainy",  # trockene Phasen und Schauer im Wechsel
-    26: "lightning",  # stark bewölkt und einige Gewitter
-    27: "snowy",  # trüb mit einigen Schneeschauern
-    28: "cloudy",  # stark bewölkt, Schneeschauer, dazwischen Blitz und Donner
-    29: "snowy-rainy",  # ab und zu Schneeregen
-    30: "snowy-rainy",  # Schneeregen, einzelne Gewitter
-    -1: "sunny",  # klar
-    -2: "partlycloudy",  # klar mit ein paar Nebelbänken
-    -3: "sunny",  # ab und zu Wolken
-    -4: "rainy",  # einige Schauer
-    -5: "lightning",  # wenige Gewitter
-    -6: "snowy",  # einzelne Schneeschauer
-    -7: "snowy",  # einige Gewitter mit Schnee
+    21: "snowy",  # Schneefall
+    22: "snowy-rainy",  # Schneeregen
+    23: "pouring",  # Dauerregen (undocumented)
+    24: "snowy",  # starker Schneefall (undocumented)
+    25: "rainy",  # Regenschauer26: "lightning",  # stark bewölkt und einige Gewitter
+    26: "lightning",  # stark bewölkt und einige Gewitter (undocumented)
+    27: "snowy",  # trüb mit einigen Schneeschauern (undocumented)
+    28: "cloudy",  # stark bewölkt, Schneeschauer, dazwischen Blitz und Donner (undocumented)
+    29: "snowy-rainy",  # ab und zu Schneeregen (undocumented)
+    30: "snowy-rainy",  # Schneeregen, einzelne Gewitter (undocumented)
+    -1: "clear-night",  # klar
+    -2: "fog",  # Nebelbänke
+    -3: "cloudy",  # Wolken: Sandsturm
+    -4: "rainy",  # Regenschauer
+    -5: "lightning-rainy",  # Regenschauer mit Gewitter
+    -6: "snowy",  # Schneeschauer
+    -7: "snowy",  # einige Gewitter mit Schnee (undocumented)
     -8: "snowy-rainy",  # Schneeregenschauer
-    -9: "lightning-rainy",  # wechselhaft mit Schneeregenschauern und Gewittern
-    -10: "partlycloudy",  # nur selten Wolken
-    -11: "rainy",  # einzelne Schauer
-    -12: "lightning",  # einzelne Gewitter
-    -13: "snowy",  # einzelne Schneeschauer
-    -14: "snowy",  # einzelne Schneeschauer, dazwischen sogar Blitz und Donner
-    -15: "snowy-rainy",  # einzelne Schauer, vereinzelt auch Flocken
-    -16: "partlycloudy",  # oft sonnig, nur einzelne gewittrige Schauer, teils auch Flocken
+    -9: "lightning-rainy",  # wechselhaft mit Schneeregenschauern und Gewittern (undocumented)
+    -10: "partlycloudy",  # klare Abschnitte
+    -11: "rainy",  # einzelne Schauer (undocumented)
+    -12: "lightning",  # einzelne Gewitter (undocumented)
+    -13: "snowy",  # einzelne Schneeschauer (undocumented)
+    -14: "snowy",  # einzelne Schneeschauer, dazwischen sogar Blitz und Donner (undocumented)
+    -15: "snowy-rainy",  # einzelne Schauer, vereinzelt auch Flocken (undocumented)
+    -16: "partlycloudy",  # oft sonnig, nur einzelne gewittrige Schauer, teils auch Flocken (undocumented)
     -17: "fog",  # Nebel
-    -18: "cloudy",  # stark bewölkt
+    -18: "cloudy",  # stark bewölkt (undocumented)
     -19: "cloudy",  # bedeckt
     -20: "rainy",  # regnerisch
-    -21: "snowy",  # stark bewölkt mit Schnee
-    -22: "snowy-rainy",  # Regen, zeitweise auch mit Flocken
-    -23: "pouring",  # Dauerregen
-    -24: "snowy",  # starker Schneefall
-    -25: "rainy",  # trockene Phasen und Schauer im Wechsel
-    -26: "lightning",  # stark bewölkt und einige Gewitter
-    -27: "rainy",  # trüb mit einigen Schneeschauern
-    -28: "lightning-rainy",  # stark bewölkt, Schneeschauer, dazwischen Blitz und Donner
-    -29: "snowy-rainy",  # ab und zu Schneeregen
-    -30: "snowy-rainy",  # Schneeregen, einzelne Gewitter
+    -21: "snowy",  # Schneefall
+    -22: "snowy-rainy",  # Schneeregen
+    -23: "pouring",  # Dauerregen (undocumented)
+    -24: "snowy",  # starker Schneefall (undocumented)
+    -25: "rainy",  # Regenschauer
+    -26: "lightning",  # stark bewölkt und einige Gewitter (undocumented)
+    -27: "rainy",  # trüb mit einigen Schneeschauern (undocumented)
+    -28: "lightning-rainy",  # stark bewölkt, Schneeschauer, dazwischen Blitz und Donner (undocumented)
+    -29: "snowy-rainy",  # ab und zu Schneeregen (undocumented)
+    -30: "snowy-rainy",  # Schneeregen, einzelne Gewitter (undocumented)
 }
 
 
-def merge_mappings(maps: Iterable[Mapping]) -> dict:
-    d = {}
-    for m in maps:
-        d.update(m)
-    return d
+def get_condition_from_symbol(symbol_id: int):
+    condition = SYMBOL_STATE_MAP.get(symbol_id)
+    if condition is None:
+        logger.warning("No condition entry for symbol id {}".format(symbol_id))
+        condition = STATE_UNAVAILABLE
+    return condition
 
 
 def weak_update(d: MutableMapping, key: str, value: MutableMapping) -> None:
