@@ -24,6 +24,7 @@ from .const import (
     ATTR_EXPIRES_AT,
     CONF_CONSUMER_KEY,
     CONF_CONSUMER_SECRET,
+    CONF_GEOLOCATION_ID,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ API_URL = "https://api.srgssr.ch"
 URL_OAUTH = API_URL + "/oauth/v1/accesstoken"
 
 URL_FORECASTS = API_URL + "/srf-meteo/forecast/{geolocationId}"
-
+URL_GEOLOCATION= API_URL + "/srf-meteo/geolocations"
 
 def _check_client_credentials_response(d: dict) -> None:
     EXPECTED_KEYS = {"issued_at", "expires_in", "access_token"}
@@ -96,19 +97,50 @@ async def get_api_key(hass: HomeAssistantType, data: MutableMapping) -> str:
         renew = time.time() >= expires_at
 
     if renew:
-        logger.info("renewing api key")
+        logger.info("Renewing API key")
         await _renew_api_key(hass, data)
 
     return data[ATTR_API_KEY]
 
+async def _get(hass, api_data: dict, url: str, **kwargs) -> dict:
+    session = async_get_clientsession(hass)
+    api_key = await get_api_key(hass, api_data)
+    weak_update(
+        kwargs,
+        "headers",
+        {
+            "Authorization": f"Bearer {api_key}",
+        },
+    )
+    logger.debug("GET %s with %s", url, kwargs)
+    async with session.get(url, **kwargs) as resp:
+        if resp.status == HTTP_OK:
+            logger.debug(
+                "Rate-limit available %s, rate-limit reset will be on %s",
+                resp.headers.get("x-ratelimit-available"),
+                datetime.fromtimestamp(
+                    int(resp.headers.get("x-ratelimit-reset-time", 0)) / 1000
+                ),
+            )
+        data = await resp.json()
+        logger.debug("response: %s", data)
+        resp.raise_for_status()
+
+    return data
+
+async def get_geolocation_ids(hass, api_data: dict, latitude: float, longitude: float):
+    coordinates = {
+        "latitude": latitude,
+        "longitude": longitude
+    }
+    data = await _get(hass, api_data, URL_GEOLOCATION, params=coordinates)
+    logger.debug(data)
+    return data
 
 class SRGSSTWeather(WeatherEntity):
     def __init__(self, config: dict) -> None:
         self._config = config
-        self._default_params = {
-            "latitude": str(config[CONF_LATITUDE]),
-            "longitude": str(config[CONF_LONGITUDE]),
-        }
+        self._geolocation_id = config[CONF_GEOLOCATION_ID]
         self._api_data = dict(self._config)
         self.__update_loop_task = None
 
@@ -127,7 +159,7 @@ class SRGSSTWeather(WeatherEntity):
 
     @property
     def unique_id(self):
-        return f"{self._config[CONF_LATITUDE]}-{self._config[CONF_LONGITUDE]}"
+        return self._config[CONF_GEOLOCATION_ID]
 
     @property
     def name(self) -> Optional[str]:
@@ -181,54 +213,24 @@ class SRGSSTWeather(WeatherEntity):
     def attribution(self) -> str:
         return "SRF Schweizer Radio und Fernsehen"
 
-    async def __get(self, url: str, **kwargs) -> dict:
-        session = async_get_clientsession(self.hass)
-        api_key = await get_api_key(self.hass, self._api_data)
-        weak_update(
-            kwargs,
-            "headers",
-            {
-                "Authorization": f"Bearer {api_key}",
-            },
-        )
-        # weak_update(kwargs, "params", self._default_params)
-        logger.debug("GET %s with %s", url, kwargs)
-        async with session.get(url, **kwargs) as resp:
-            if resp.status == HTTP_OK:
-                logger.debug(
-                    "Rate-limit available %s, rate-limit reset will be on %s",
-                    resp.headers.get("x-ratelimit-available"),
-                    datetime.fromtimestamp(
-                        int(resp.headers.get("x-ratelimit-reset-time", 0)) / 1000
-                    ),
-                )
-            data = await resp.json()
-            logger.debug("response: %s", data)
-            resp.raise_for_status()
-
-        return data
-
     async def __update(self) -> None:
-        geoid = "{},{}".format(
-            self._default_params["latitude"], self._default_params["longitude"]
-        )
-        url = URL_FORECASTS.format(geolocationId="47.0274,8.3020")
+        url = URL_FORECASTS.format(geolocationId=self._geolocation_id)
         logger.debug("Updating using URL %s", url)
-        data = await self.__get(url)
+        data = await _get(self.hass, self._api_data, url)
 
         logger.debug(data)
-        hourlyforecast = data["forecast"]["60minutes"]
+        hourly_forecast = data["forecast"]["60minutes"]
 
         now = datetime.now().astimezone()
-        futureforecast = (
+        future_hourly_forecast = (
             f
-            for f in hourlyforecast
+            for f in hourly_forecast
             if datetime.fromisoformat(f["local_date_time"]) > now
         )
         forecastnow = next(futureforecast, None)
         if forecastnow is None:
             logger.warning("No forecast found for current hour {}".format(now))
-            forecastnow = hourlyforecast[-1]
+            forecastnow = future_hourly_forecast[-1]
 
         logger.debug(forecastnow)
 
@@ -240,33 +242,34 @@ class SRGSSTWeather(WeatherEntity):
         wind_bearing_deg = float(forecastnow["DD_DEG"])
         self._wind_bearing = deg_to_cardinal(wind_bearing_deg)
 
-        self._state_attrs.update(
-            wind_direction=wind_bearing_deg,
-            symbol_id=symbol_id,
-            precipitation=float(forecastnow["RRR_MM"]),
-            rain_probability=float(forecastnow["PROBPCP_PERCENT"]),
-        )
-
+        # Remove today from the forecast as we show the current weather from hourly forecast
         forecast = []
-        for raw_day in data["forecast"]["day"]:
+        for raw_day in data["forecast"]["day"][1:]:
             try:
-                day = parse_forecast(raw_day)
+                day = parse_forecast_day(raw_day)
             except Exception:
-                logger.warning(f"failed to parse forecast day: {raw_day}")
+                logger.warning(f"failed to parse daily forecast: {raw_day}", exc_info=True)
                 continue
             forecast.append(day)
 
         self._forecast = forecast
 
         hourly_forecast = []
-        for raw_hour in data["forecast"]["60minutes"]:
+        for raw_hour in future_hourly_forecast:
             try:
-                hour = parse_forecast(raw_hour)
-            except Exception:
-                logger.warning(f"failed to parse forecast day: {raw_hour}")
+                hour = parse_forecast_hour(raw_hour)
+            except Exception as e:
+                logger.warning(f"failed to parse hourly forecast: {raw_hour}", exc_info=True)
                 continue
-            forecast.append(hour)
-        self._hourly_forecast = hourly_forecast
+            hourly_forecast.append(hour)
+
+        self._state_attrs.update(
+            wind_direction=wind_bearing_deg,
+            symbol_id=symbol_id,
+            precipitation=float(forecastnow["RRR_MM"]),
+            precipitation_probability=float(forecastnow["PROBPCP_PERCENT"]),
+            hourly_forecast=hourly_forecast,
+        )
 
     async def __update_loop(self) -> None:
         while True:
@@ -291,27 +294,53 @@ class SRGSSTWeather(WeatherEntity):
             self.__update_loop_task = None
 
 
-def parse_forecast(day: dict) -> dict:
-    date = datetime.fromisoformat(day["local_date_time"])
+def parse_forecast(forecast: dict) -> dict:
+    date = datetime.fromisoformat(forecast["local_date_time"])
+
+    symbol_id = int(forecast["SYMBOL_CODE"])
+    condition = get_condition_from_symbol(symbol_id)
+    precip_total = float(forecast["RRR_MM"])
+    wind_speed = float(forecast["FF_KMH"])
+    percip_probability = float(forecast["PROBPCP_PERCENT"])
+
+    data = {
+        "datetime": date.isoformat(),
+        "condition": condition,
+        "symbol_id": symbol_id,
+        "precipitation": precip_total,
+        "wind_speed": wind_speed,
+        "precipitation_probability": percip_probability,
+    }
+
+    # For some unknown reason, wind bearing is sometimes missing
+    if "DD_DEG" in forecast:
+        data["wind_bearing"] = int(forecast["DD_DEG"])
+
+    return data
+
+def parse_forecast_day(day: dict) -> dict:
+    data = parse_forecast(day)
 
     temp_high = float(day["TX_C"])
     temp_low = float(day["TN_C"])
-    symbol_id = int(day["SYMBOL_CODE"])
-    condition = get_condition_from_symbol(symbol_id)
-    precip_total = float(day["RRR_MM"])
-    wind_bearing = int(day["DD_DEG"])
-    wind_speed = float(day["FF_KMH"])
 
-    return {
-        "datetime": date.isoformat(),
+    data.update({
         "temperature": temp_high,
-        "condition": condition,
-        "symbol_id": symbol_id,
         "templow": temp_low,
-        "precipitation": precip_total,
-        "wind_bearing": precip_total,
-        "wind_speed": wind_speed,
-    }
+    })
+
+    return data
+
+def parse_forecast_hour(hour: dict) -> dict:
+    data = parse_forecast(hour)
+
+    temperature = float(hour["TTT_C"])
+
+    data.update({
+        "temperature": temperature,
+    })
+
+    return data
 
 
 CARDINALS = (
@@ -357,7 +386,7 @@ SYMBOL_STATE_MAP = {
     8: "snowy-rainy",  # Schneeregenschauer
     9: "snowy-rainy",  # wechselhaft mit Schneeregenschauern und Gewittern (undocumented)
     10: "sunny",  # ziemlich sonnig
-    11: "sunny",  # sonnig, aber auch einzelne Schauer (undocumented)
+    11: "partlycloudy",  # sonnig, aber auch einzelne Schauer (undocumented)
     12: "sunny",  # sonnig und nur einzelne Gewitter (undocumented)
     13: "sunny",  # sonnig und nur einzelne Schneeschauer (undocumented)
     14: "sunny",  # sonnig, einzelne Schneeschauer, dazwischen sogar Blitz und Donner (undocumented)

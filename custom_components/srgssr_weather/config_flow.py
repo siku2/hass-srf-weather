@@ -6,9 +6,9 @@ from homeassistant.const import CONF_BASE, CONF_LATITUDE, CONF_LONGITUDE, CONF_N
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import HomeAssistantType
 
-from .const import CONF_CONSUMER_KEY, CONF_CONSUMER_SECRET, DOMAIN, ERROR_INVALID_CREDENTIALS, ERROR_LOCATION_EXISTS, \
-    HOME_LOCATION_NAME
-from .weather import request_access_token
+from .const import CONF_CONSUMER_KEY, CONF_CONSUMER_SECRET, CONF_GEOLOCATION_ID, DOMAIN, ERROR_INVALID_CREDENTIALS, ERROR_GEOLOCATION_EXISTS, \
+    ERROR_NO_GEOLOCATION_FOUND, HOME_LOCATION_NAME
+from .weather import request_access_token, get_geolocation_ids
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 def has_config_entry(hass: HomeAssistantType, key: str) -> bool:
     for entry in hass.config_entries.async_entries(DOMAIN):
         data = entry.data
-        entry_key = f"{data[CONF_LATITUDE]}-{data[CONF_LONGITUDE]}"
-        if entry_key == key:
+        if data[CONF_GEOLOCATION_ID] == key:
             return True
 
     return False
@@ -26,6 +25,8 @@ def has_config_entry(hass: HomeAssistantType, key: str) -> bool:
 class SRGSSRConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._credentials = None
+        self._location = None
+        self._geolocations = None
 
     async def async_step_credentials(self, user_input: dict = None) -> dict:
         errors = {}
@@ -51,26 +52,24 @@ class SRGSSRConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_user(self, user_input: dict = None) -> dict:
-        if self._credentials is None:
-            return await self.async_step_credentials()
-        else:
-            return await self.async_step_location()
-
     async def async_step_location(self, user_input: dict = None) -> dict:
-        errors = {}
+        errors: dict[str, str] = {}
 
         if user_input is not None:
-            key = f"{user_input[CONF_LATITUDE]}-{user_input[CONF_LONGITUDE]}"
-            if has_config_entry(self.hass, key):
-                errors[CONF_BASE] = ERROR_LOCATION_EXISTS
+            latitude = user_input[CONF_LATITUDE]
+            longitude = user_input[CONF_LONGITUDE]
+            geolocations = await get_geolocation_ids(self.hass, self._credentials, latitude, longitude)
+
+            if geolocations is None or len(geolocations) == 0:
+                logger.debug("No geolocation found for coordinates %f, %f", latitude, longitude)
+                errors[CONF_BASE] = ERROR_NO_GEOLOCATION_FOUND
             else:
-                data = user_input
-                data.update(self._credentials)
-                return self.async_create_entry(title=data[CONF_NAME], data=data)
+                self._location = user_input
+                self._geolocations = geolocations
+                return await self.async_step_geolocationid()
 
         hass_config = self.hass.config
-
+        logger.debug("Show again, with errors %s", errors)
         return self.async_show_form(
             step_id="location",
             data_schema=vol.Schema({
@@ -80,3 +79,38 @@ class SRGSSRConfigFlow(ConfigFlow, domain=DOMAIN):
             }),
             errors=errors,
         )
+
+    async def async_step_geolocationid(self, user_input: dict = None) -> dict:
+        errors = {}
+
+        if user_input is not None:
+            if has_config_entry(self.hass, user_input[CONF_GEOLOCATION_ID]):
+                errors[CONF_BASE] = ERROR_GEOLOCATION_EXISTS
+            else:
+                data = user_input
+                data.update(self._credentials)
+                data.update(self._location)
+                logger.debug("Creating entity with data %s", data)
+                return self.async_create_entry(title=data[CONF_NAME], data=data)
+
+        geolocations = {
+            geoloc["id"]: geoloc["default_name"]
+            for geoloc in self._geolocations
+        }
+        logger.debug(geolocations)
+
+        return self.async_show_form(
+            step_id="geolocationid",
+            data_schema=vol.Schema({
+                vol.Required(CONF_GEOLOCATION_ID): vol.In(geolocations)
+            }),
+            errors=errors,
+        )
+
+    async def async_step_user(self, user_input: dict = None) -> dict:
+        if self._credentials is None:
+            return await self.async_step_credentials()
+        elif self._location is None:
+            return await self.async_step_location()
+        else:
+            return await self.async_step_location()
