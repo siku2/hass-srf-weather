@@ -3,7 +3,7 @@ import base64
 import logging
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, MutableMapping, Optional
 from itertools import islice
 
@@ -28,6 +28,7 @@ from .const import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_SCAN_INTERVAL = timedelta(minutes=60)
 
 async def async_setup_entry(
     hass: HomeAssistantType, config_entry: ConfigEntry, async_add_entities
@@ -270,19 +271,16 @@ class SRGSSTWeather(WeatherEntity):
             hourly_forecast=hourly_forecast,
         )
 
-    async def __update_loop(self) -> None:
-        while True:
-            try:
-                await self.__update()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("failed to update weather")
-            else:
-                await self.async_update_ha_state()
-
-            delay = random.randrange(55, 65) * 60
-            await asyncio.sleep(delay)
+    async def async_update(self) -> None:
+        """Get the latest data from SRF-Meteo API and updates the states."""
+        try:
+            await self.__update()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("failed to update weather")
+        else:
+            await self.async_update_ha_state()
 
     async def async_added_to_hass(self) -> None:
         self.__update_loop_task = asyncio.create_task(self.__update_loop())
