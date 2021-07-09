@@ -219,56 +219,77 @@ class SRGSSTWeather(WeatherEntity):
         data = await _get(self.hass, self._api_data, url)
 
         logger.debug(data)
-        hourly_forecast = data["forecast"]["60minutes"]
 
-        now = datetime.now().astimezone()
-        future_hourly_forecast = (
-            f
-            for f in hourly_forecast
-            if datetime.fromisoformat(f["local_date_time"]) > now
-        )
-        forecastnow = next(future_hourly_forecast, None)
-        if forecastnow is None:
-            logger.warning("No forecast found for current hour {}".format(now))
-            forecastnow = future_hourly_forecast[-1]
-
-        logger.debug(forecastnow)
-
-        symbol_id = int(forecastnow["SYMBOL_CODE"])
-        self._state = get_condition_from_symbol(symbol_id)
-        self._temperature = float(forecastnow["TTT_C"])
-        self._wind_speed = float(forecastnow["FF_KMH"])
-        self._wind_speed = float(forecastnow["FX_KMH"])
-        wind_bearing_deg = float(forecastnow["DD_DEG"])
-        self._wind_bearing = deg_to_cardinal(wind_bearing_deg)
-
-        # Remove today from the forecast as we show the current weather from hourly forecast
         forecast = []
-        for raw_day in data["forecast"]["day"][1:]:
+        now = datetime.now().astimezone().replace(minute=0, second=0, microsecond=0)
+
+        # The API seems to provides 4 days worth of hourly (aka 60minutes) forcasts
+        # and 7 days tripe-hour (aka hourly)/daily forcasts.
+
+        # Get 12h hourly, fill today and the next day with triple-hour and daily
+        # forcasts for the rest
+        hourly_split = now + timedelta(hours=12)
+        for raw_hour in data["forecast"]["60minutes"]:
             try:
-                day = parse_forecast_day(raw_day)
+                fdate, hour = parse_forecast_hour(raw_hour)
+            except Exception:
+                logger.warning(f"failed to parse hourly forecast: {raw_hour}", exc_info=True)
+                continue
+
+            # Don't care about the past...
+            if fdate < now:
+                continue
+
+            if fdate > hourly_split:
+                break
+
+            forecast.append(hour)
+
+        triple_hour_split = (now + timedelta(days=2)).replace(hour=0)
+        for raw_three_hour in data["forecast"]["hour"]:
+            try:
+                fdate, three_hour = parse_forecast_hour(raw_three_hour)
+            except Exception:
+                logger.warning(f"failed to parse triple-hourly forecast: {raw_three_hour}", exc_info=True)
+                continue
+
+            if fdate <= hourly_split:
+                continue
+
+            if fdate > triple_hour_split:
+                break
+
+            forecast.append(three_hour)
+
+        for raw_day in data["forecast"]["day"]:
+            try:
+                fdate, day = parse_forecast_day(raw_day)
             except Exception:
                 logger.warning(f"failed to parse daily forecast: {raw_day}", exc_info=True)
                 continue
+
+            if fdate <= triple_hour_split:
+                continue
+
             forecast.append(day)
 
         self._forecast = forecast
 
-        hourly_forecast = []
-        for raw_hour in islice(future_hourly_forecast, 24):
-            try:
-                hour = parse_forecast_hour(raw_hour)
-            except Exception as e:
-                logger.warning(f"failed to parse hourly forecast: {raw_hour}", exc_info=True)
-                continue
-            hourly_forecast.append(hour)
+        # Remove current "forecast" from forecast and use it as current weather
+        forecastnow = forecast.pop(0)
+
+        logger.debug(forecastnow)
+
+        self._state = forecastnow["condition"]
+        self._temperature = forecastnow["temperature"]
+        self._wind_speed = forecastnow["wind_speed"]
+        self._wind_bearing = deg_to_cardinal(forecastnow["wind_bearing"])
 
         self._state_attrs.update(
-            wind_direction=wind_bearing_deg,
-            symbol_id=symbol_id,
-            precipitation=float(forecastnow["RRR_MM"]),
-            precipitation_probability=float(forecastnow["PROBPCP_PERCENT"]),
-            hourly_forecast=hourly_forecast,
+            wind_direction=forecastnow["wind_bearing"],
+            symbol_id=forecastnow["symbol_id"],
+            precipitation=forecastnow["precipitation"],
+            precipitation_probability=forecastnow["precipitation_probability"],
         )
 
     async def async_update(self) -> None:
@@ -303,10 +324,11 @@ def parse_forecast(forecast: dict) -> Tuple[datetime, dict]:
     if "DD_DEG" in forecast:
         data["wind_bearing"] = int(forecast["DD_DEG"])
 
-    return data
+    return (date, data)
 
-def parse_forecast_day(day: dict) -> dict:
-    data = parse_forecast(day)
+
+def parse_forecast_day(day: dict) -> Tuple[datetime, dict]:
+    date, data = parse_forecast(day)
 
     temp_high = float(day["TX_C"])
     temp_low = float(day["TN_C"])
@@ -316,10 +338,11 @@ def parse_forecast_day(day: dict) -> dict:
         "templow": temp_low,
     })
 
-    return data
+    return (date, data)
 
-def parse_forecast_hour(hour: dict) -> dict:
-    data = parse_forecast(hour)
+
+def parse_forecast_hour(hour: dict) -> Tuple[datetime, dict]:
+    date, data = parse_forecast(hour)
 
     temperature = float(hour["TTT_C"])
 
@@ -327,7 +350,7 @@ def parse_forecast_hour(hour: dict) -> dict:
         "temperature": temperature,
     })
 
-    return data
+    return (date, data)
 
 
 CARDINALS = (
