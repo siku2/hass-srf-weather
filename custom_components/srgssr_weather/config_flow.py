@@ -5,6 +5,7 @@ from homeassistant.config_entries import ConfigFlow
 from homeassistant.const import CONF_BASE, CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import HomeAssistantType
+from typing import Dict
 
 from .const import CONF_CONSUMER_KEY, CONF_CONSUMER_SECRET, CONF_GEOLOCATION_ID, DOMAIN, ERROR_INVALID_CREDENTIALS, ERROR_GEOLOCATION_EXISTS, \
     ERROR_NO_GEOLOCATION_FOUND, HOME_LOCATION_NAME
@@ -53,7 +54,7 @@ class SRGSSRConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_location(self, user_input: dict = None) -> dict:
-        errors: dict[str, str] = {}
+        errors: Dict[str, str] = {}
 
         if user_input is not None:
             latitude = user_input[CONF_LATITUDE]
