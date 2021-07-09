@@ -43,6 +43,7 @@ URL_OAUTH = API_URL + "/oauth/v1/accesstoken"
 URL_FORECASTS = API_URL + "/srf-meteo/forecast/{geolocationId}"
 URL_GEOLOCATION= API_URL + "/srf-meteo/geolocations"
 
+
 def _check_client_credentials_response(d: dict) -> None:
     EXPECTED_KEYS = {"issued_at", "expires_in", "access_token"}
 
@@ -102,6 +103,7 @@ async def get_api_key(hass: HomeAssistantType, data: MutableMapping) -> str:
 
     return data[ATTR_API_KEY]
 
+
 async def _get(hass, api_data: dict, url: str, **kwargs) -> dict:
     session = async_get_clientsession(hass)
     api_key = await get_api_key(hass, api_data)
@@ -128,6 +130,7 @@ async def _get(hass, api_data: dict, url: str, **kwargs) -> dict:
 
     return data
 
+
 async def get_geolocation_ids(hass, api_data: dict, latitude: float, longitude: float):
     coordinates = {
         "latitude": latitude,
@@ -136,6 +139,7 @@ async def get_geolocation_ids(hass, api_data: dict, latitude: float, longitude: 
     data = await _get(hass, api_data, URL_GEOLOCATION, params=coordinates)
     logger.debug(data)
     return data
+
 
 class SRGSSTWeather(WeatherEntity):
     def __init__(self, config: dict) -> None:
