@@ -33,7 +33,7 @@ SCAN_INTERVAL = timedelta(minutes=60)
 async def async_setup_entry(
     hass: HomeAssistantType, config_entry: ConfigEntry, async_add_entities
 ) -> None:
-    async_add_entities((SRGSSTWeather(config_entry.data),), True)
+    async_add_entities((SRFWeather(config_entry.data),), True)
 
 
 API_URL = "https://api.srgssr.ch"
@@ -141,7 +141,7 @@ async def get_geolocation_ids(hass, api_data: dict, latitude: float, longitude: 
     return data
 
 
-class SRGSSTWeather(WeatherEntity):
+class SRFWeather(WeatherEntity):
     def __init__(self, config: dict) -> None:
         self._config = config
         self._geolocation_id = config[CONF_GEOLOCATION_ID]

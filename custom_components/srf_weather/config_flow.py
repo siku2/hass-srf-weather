@@ -23,7 +23,7 @@ def has_config_entry(hass: HomeAssistantType, key: str) -> bool:
     return False
 
 
-class SRGSSRConfigFlow(ConfigFlow, domain=DOMAIN):
+class SRFMeteoConfigFlow(ConfigFlow, domain=DOMAIN):
     """SRF-Meteo configuration flow."""
 
     def __init__(self) -> None:

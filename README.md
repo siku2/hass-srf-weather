@@ -1,9 +1,11 @@
-# Home Assistant SRG SSR SRF-Weather integration
+# Home Assistant SRF Weather integration
 
 Brings [SRF Meteo](https://www.srf.ch/meteo) weather forecasts to your Home Assistant.
 
-Note that the SRG SSR APIs require a developer account.
-Follow the installation instructions shown in HACS or read the [info](info.md) file directly.
+This integration uses the SRF Weather API provided by SRG SSR. The SRG SSR APIs
+require an API key. You can create your personal API key by registering a
+developer account. Follow the installation instructions shown in HACS or read
+the [info](info.md) file directly.
 
 ## Installation with HACS
 
