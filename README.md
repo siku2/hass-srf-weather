@@ -7,6 +7,11 @@ require an API key. You can create your personal API key by registering a
 developer account. Follow the installation instructions shown in HACS or read
 the [info](info.md) file directly.
 
+Note: With version 2.0 this integration makes use of the new "SRF Weather" API.
+For this reason the integration has been renamed. If you have been using
+previous version of this integration, you need to remove the integration and
+readd the "SRF Weather" integration.
+
 ## Installation with HACS
 
 1. Go to the HACS Settings and add the custom repository `siku2/hass-weather-srgssr` with category "Integration".
