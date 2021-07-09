@@ -13,10 +13,14 @@ async def async_setup(hass: HomeAssistantType, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistantType, config_entry: ConfigEntry) -> bool:
-    hass.async_create_task(hass.config_entries.async_forward_entry_setup(config_entry, WEATHER_DOMAIN))
+    hass.async_create_task(
+        hass.config_entries.async_forward_entry_setup(config_entry, WEATHER_DOMAIN)
+    )
     return True
 
 
-async def async_unload_entry(hass: HomeAssistantType, config_entry: ConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistantType, config_entry: ConfigEntry
+) -> bool:
     await hass.config_entries.async_forward_entry_unload(config_entry, WEATHER_DOMAIN)
     return True

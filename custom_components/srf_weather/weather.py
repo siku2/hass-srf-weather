@@ -41,7 +41,7 @@ API_URL = "https://api.srgssr.ch"
 URL_OAUTH = API_URL + "/oauth/v1/accesstoken"
 
 URL_FORECASTS = API_URL + "/srf-meteo/forecast/{geolocationId}"
-URL_GEOLOCATION= API_URL + "/srf-meteo/geolocations"
+URL_GEOLOCATION = API_URL + "/srf-meteo/geolocations"
 
 
 def _check_client_credentials_response(d: dict) -> None:
@@ -132,10 +132,7 @@ async def _get(hass, api_data: dict, url: str, **kwargs) -> dict:
 
 
 async def get_geolocation_ids(hass, api_data: dict, latitude: float, longitude: float):
-    coordinates = {
-        "latitude": latitude,
-        "longitude": longitude
-    }
+    coordinates = {"latitude": latitude, "longitude": longitude}
     data = await _get(hass, api_data, URL_GEOLOCATION, params=coordinates)
     logger.debug(data)
     return data
@@ -237,7 +234,9 @@ class SRFWeather(WeatherEntity):
             try:
                 fdate, hour = parse_forecast_hour(raw_hour)
             except Exception:
-                logger.warning(f"failed to parse hourly forecast: {raw_hour}", exc_info=True)
+                logger.warning(
+                    f"failed to parse hourly forecast: {raw_hour}", exc_info=True
+                )
                 continue
 
             # Don't care about the past...
@@ -254,7 +253,10 @@ class SRFWeather(WeatherEntity):
             try:
                 fdate, three_hour = parse_forecast_hour(raw_three_hour)
             except Exception:
-                logger.warning(f"failed to parse triple-hourly forecast: {raw_three_hour}", exc_info=True)
+                logger.warning(
+                    f"failed to parse triple-hourly forecast: {raw_three_hour}",
+                    exc_info=True,
+                )
                 continue
 
             if fdate <= hourly_split:
@@ -269,7 +271,9 @@ class SRFWeather(WeatherEntity):
             try:
                 fdate, day = parse_forecast_day(raw_day)
             except Exception:
-                logger.warning(f"failed to parse daily forecast: {raw_day}", exc_info=True)
+                logger.warning(
+                    f"failed to parse daily forecast: {raw_day}", exc_info=True
+                )
                 continue
 
             if fdate <= triple_hour_split:
@@ -337,10 +341,12 @@ def parse_forecast_day(day: dict) -> Tuple[datetime, dict]:
     temp_high = float(day["TX_C"])
     temp_low = float(day["TN_C"])
 
-    data.update({
-        "temperature": temp_high,
-        "templow": temp_low,
-    })
+    data.update(
+        {
+            "temperature": temp_high,
+            "templow": temp_low,
+        }
+    )
 
     return (date, data)
 
@@ -350,9 +356,11 @@ def parse_forecast_hour(hour: dict) -> Tuple[datetime, dict]:
 
     temperature = float(hour["TTT_C"])
 
-    data.update({
-        "temperature": temperature,
-    })
+    data.update(
+        {
+            "temperature": temperature,
+        }
+    )
 
     return (date, data)
 

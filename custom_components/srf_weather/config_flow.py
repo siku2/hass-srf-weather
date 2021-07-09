@@ -7,8 +7,16 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import HomeAssistantType
 from typing import Dict
 
-from .const import CONF_CONSUMER_KEY, CONF_CONSUMER_SECRET, CONF_GEOLOCATION_ID, DOMAIN, ERROR_INVALID_CREDENTIALS, ERROR_GEOLOCATION_EXISTS, \
-    ERROR_NO_GEOLOCATION_FOUND, HOME_LOCATION_NAME
+from .const import (
+    CONF_CONSUMER_KEY,
+    CONF_CONSUMER_SECRET,
+    CONF_GEOLOCATION_ID,
+    DOMAIN,
+    ERROR_INVALID_CREDENTIALS,
+    ERROR_GEOLOCATION_EXISTS,
+    ERROR_NO_GEOLOCATION_FOUND,
+    HOME_LOCATION_NAME,
+)
 from .weather import request_access_token, get_geolocation_ids
 
 logger = logging.getLogger(__name__)
@@ -48,10 +56,12 @@ class SRFMeteoConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="credentials",
-            data_schema=vol.Schema({
-                vol.Required(CONF_CONSUMER_KEY): str,
-                vol.Required(CONF_CONSUMER_SECRET): str,
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_CONSUMER_KEY): str,
+                    vol.Required(CONF_CONSUMER_SECRET): str,
+                }
+            ),
             errors=errors,
         )
 
@@ -61,10 +71,14 @@ class SRFMeteoConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             latitude = user_input[CONF_LATITUDE]
             longitude = user_input[CONF_LONGITUDE]
-            geolocations = await get_geolocation_ids(self.hass, self._credentials, latitude, longitude)
+            geolocations = await get_geolocation_ids(
+                self.hass, self._credentials, latitude, longitude
+            )
 
             if geolocations is None or len(geolocations) == 0:
-                logger.debug("No geolocation found for coordinates %f, %f", latitude, longitude)
+                logger.debug(
+                    "No geolocation found for coordinates %f, %f", latitude, longitude
+                )
                 errors[CONF_BASE] = ERROR_NO_GEOLOCATION_FOUND
             else:
                 self._location = user_input
@@ -75,11 +89,17 @@ class SRFMeteoConfigFlow(ConfigFlow, domain=DOMAIN):
         logger.debug("Show again, with errors %s", errors)
         return self.async_show_form(
             step_id="location",
-            data_schema=vol.Schema({
-                vol.Required(CONF_NAME, default=HOME_LOCATION_NAME): str,
-                vol.Required(CONF_LATITUDE, default=hass_config.latitude): cv.latitude,
-                vol.Required(CONF_LONGITUDE, default=hass_config.longitude): cv.longitude,
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_NAME, default=HOME_LOCATION_NAME): str,
+                    vol.Required(
+                        CONF_LATITUDE, default=hass_config.latitude
+                    ): cv.latitude,
+                    vol.Required(
+                        CONF_LONGITUDE, default=hass_config.longitude
+                    ): cv.longitude,
+                }
+            ),
             errors=errors,
         )
 
@@ -97,16 +117,15 @@ class SRFMeteoConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(title=data[CONF_NAME], data=data)
 
         geolocations = {
-            geoloc["id"]: geoloc["default_name"]
-            for geoloc in self._geolocations
+            geoloc["id"]: geoloc["default_name"] for geoloc in self._geolocations
         }
         logger.debug(geolocations)
 
         return self.async_show_form(
             step_id="geolocationid",
-            data_schema=vol.Schema({
-                vol.Required(CONF_GEOLOCATION_ID): vol.In(geolocations)
-            }),
+            data_schema=vol.Schema(
+                {vol.Required(CONF_GEOLOCATION_ID): vol.In(geolocations)}
+            ),
             errors=errors,
         )
 
