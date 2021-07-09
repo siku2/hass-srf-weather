@@ -4,8 +4,7 @@ import logging
 import random
 import time
 from datetime import datetime, timedelta
-from typing import List, MutableMapping, Optional
-from itertools import islice
+from typing import List, MutableMapping, Optional, Tuple
 
 from homeassistant.components.weather import WeatherEntity
 from homeassistant.config_entries import ConfigEntry
@@ -28,12 +27,13 @@ from .const import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SCAN_INTERVAL = timedelta(minutes=60)
+SCAN_INTERVAL = timedelta(minutes=60)
+
 
 async def async_setup_entry(
     hass: HomeAssistantType, config_entry: ConfigEntry, async_add_entities
 ) -> None:
-    async_add_entities((SRGSSTWeather(config_entry.data),))
+    async_add_entities((SRGSSTWeather(config_entry.data),), True)
 
 
 API_URL = "https://api.srgssr.ch"
@@ -155,7 +155,7 @@ class SRGSSTWeather(WeatherEntity):
 
     @property
     def should_poll(self) -> bool:
-        return False
+        return True
 
     @property
     def unique_id(self):
@@ -279,19 +279,9 @@ class SRGSSTWeather(WeatherEntity):
             raise
         except Exception:
             logger.exception("failed to update weather")
-        else:
-            await self.async_update_ha_state()
-
-    async def async_added_to_hass(self) -> None:
-        self.__update_loop_task = asyncio.create_task(self.__update_loop())
-
-    async def async_will_remove_from_hass(self) -> None:
-        if self.__update_loop_task:
-            self.__update_loop_task.cancel()
-            self.__update_loop_task = None
 
 
-def parse_forecast(forecast: dict) -> dict:
+def parse_forecast(forecast: dict) -> Tuple[datetime, dict]:
     date = datetime.fromisoformat(forecast["local_date_time"])
 
     symbol_id = int(forecast["SYMBOL_CODE"])
