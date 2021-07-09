@@ -1,4 +1,4 @@
-DOMAIN = "srgssr_weather"
+DOMAIN = "srf_weather"
 
 HOME_LOCATION_NAME = "Home"
 
