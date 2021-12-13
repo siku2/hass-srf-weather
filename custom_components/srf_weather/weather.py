@@ -10,7 +10,6 @@ from homeassistant.components.weather import WeatherEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_NAME,
-    HTTP_OK,
     TEMP_CELSIUS,
     STATE_UNAVAILABLE,
 )
@@ -23,6 +22,7 @@ from .const import (
     CONF_CONSUMER_KEY,
     CONF_CONSUMER_SECRET,
     CONF_GEOLOCATION_ID,
+    HTTP_OK,
 )
 
 logger = logging.getLogger(__name__)

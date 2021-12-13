@@ -12,3 +12,5 @@ ATTR_API_KEY = "api_key"
 ERROR_INVALID_CREDENTIALS = "invalid_credentials"
 ERROR_NO_GEOLOCATION_FOUND = "no_geolocation_found"
 ERROR_GEOLOCATION_EXISTS = "geolocation_exists"
+
+HTTP_OK = 200
