@@ -167,7 +167,7 @@ class SRFWeather(WeatherEntity):
         return self._config.get(CONF_NAME)
 
     @property
-    def device_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict:
         return self._state_attrs
 
     @property
