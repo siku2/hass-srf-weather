@@ -107,17 +107,18 @@ async def _get(hass, api_data: dict, url: str, expected_mime_type: str, **kwargs
     )
     logger.debug("GET %s with %s", url, kwargs)
     async with session.get(url, **kwargs) as resp:
-        if resp.status == HTTP_OK:
-            logger.debug(
-                "Rate-limit available %s, rate-limit reset will be on %s",
-                resp.headers.get("x-ratelimit-available"),
-                datetime.fromtimestamp(
-                    int(resp.headers.get("x-ratelimit-reset-time", 0)) / 1000
-                ),
-            )
-        data = await resp.json(content_type=expected_mime_type)
-        logger.debug("API Response: %s", data)
+        logger.debug("API Response: %s", resp)
         resp.raise_for_status()
+
+        logger.debug(
+            "Rate-limit available %s, rate-limit reset will be on %s",
+            resp.headers.get("x-ratelimit-available"),
+            datetime.fromtimestamp(
+                int(resp.headers.get("x-ratelimit-reset-time", 0)) / 1000
+            ),
+        )
+
+        data = await resp.json(content_type=expected_mime_type)
 
     return data
 
