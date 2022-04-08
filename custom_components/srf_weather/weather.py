@@ -102,6 +102,7 @@ async def _get(hass, api_data: dict, url: str, **kwargs) -> dict:
         "headers",
         {
             "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
         },
     )
     logger.debug("GET %s with %s", url, kwargs)
@@ -114,8 +115,8 @@ async def _get(hass, api_data: dict, url: str, **kwargs) -> dict:
                     int(resp.headers.get("x-ratelimit-reset-time", 0)) / 1000
                 ),
             )
-        data = await resp.json()
-        logger.debug("response: %s", data)
+        data = await resp.json(content_type='text/html')
+        logger.debug("API Response: %s", data)
         resp.raise_for_status()
 
     return data
