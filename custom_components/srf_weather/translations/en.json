@@ -6,10 +6,9 @@
       "no_geolocation_found": "No geolocation found"
     },
     "step": {
-      "user": {
+      "location": {
         "data": {
-          "latitude": "Latitude",
-          "longitude": "Longitude",
+          "location": "Location",
           "name": "Name"
         },
         "description": "Location to provide weather for",

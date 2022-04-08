@@ -8,22 +8,12 @@ from typing import List, MutableMapping, Optional, Tuple
 
 from homeassistant.components.weather import WeatherEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_NAME,
-    TEMP_CELSIUS,
-    STATE_UNAVAILABLE,
-)
+from homeassistant.const import CONF_NAME, STATE_UNAVAILABLE, TEMP_CELSIUS
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import HomeAssistantType
 
-from .const import (
-    ATTR_API_KEY,
-    ATTR_EXPIRES_AT,
-    CONF_CONSUMER_KEY,
-    CONF_CONSUMER_SECRET,
-    CONF_GEOLOCATION_ID,
-    HTTP_OK,
-)
+from .const import (ATTR_API_KEY, ATTR_EXPIRES_AT, CONF_CONSUMER_KEY,
+                    CONF_CONSUMER_SECRET, CONF_GEOLOCATION_ID, HTTP_OK)
 
 logger = logging.getLogger(__name__)
 
