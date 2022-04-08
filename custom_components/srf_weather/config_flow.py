@@ -1,23 +1,19 @@
 import logging
+from typing import Dict
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow
-from homeassistant.const import CONF_BASE, CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME
+from homeassistant.const import (CONF_BASE, CONF_LATITUDE, CONF_LOCATION,
+                                 CONF_LONGITUDE, CONF_NAME)
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.selector import selector
 from homeassistant.helpers.typing import HomeAssistantType
-from typing import Dict
 
-from .const import (
-    CONF_CONSUMER_KEY,
-    CONF_CONSUMER_SECRET,
-    CONF_GEOLOCATION_ID,
-    DOMAIN,
-    ERROR_INVALID_CREDENTIALS,
-    ERROR_GEOLOCATION_EXISTS,
-    ERROR_NO_GEOLOCATION_FOUND,
-    HOME_LOCATION_NAME,
-)
-from .weather import request_access_token, get_geolocation_ids
+from .const import (CONF_CONSUMER_KEY, CONF_CONSUMER_SECRET,
+                    CONF_GEOLOCATION_ID, DOMAIN, ERROR_GEOLOCATION_EXISTS,
+                    ERROR_INVALID_CREDENTIALS, ERROR_NO_GEOLOCATION_FOUND,
+                    HOME_LOCATION_NAME)
+from .weather import get_geolocation_ids, request_access_token
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +65,8 @@ class SRFMeteoConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: Dict[str, str] = {}
 
         if user_input is not None:
-            latitude = user_input[CONF_LATITUDE]
-            longitude = user_input[CONF_LONGITUDE]
+            latitude = user_input[CONF_LOCATION][CONF_LATITUDE]
+            longitude = user_input[CONF_LOCATION][CONF_LONGITUDE]
             geolocations = await get_geolocation_ids(
                 self.hass, self._credentials, latitude, longitude
             )
@@ -85,7 +81,7 @@ class SRFMeteoConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._geolocations = geolocations
                 return await self.async_step_geolocationid()
 
-        hass_config = self.hass.config
+        user_input = {}
         logger.debug("Show again, with errors %s", errors)
         return self.async_show_form(
             step_id="location",
@@ -93,11 +89,15 @@ class SRFMeteoConfigFlow(ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_NAME, default=HOME_LOCATION_NAME): str,
                     vol.Required(
-                        CONF_LATITUDE, default=hass_config.latitude
-                    ): cv.latitude,
-                    vol.Required(
-                        CONF_LONGITUDE, default=hass_config.longitude
-                    ): cv.longitude,
+                        CONF_LOCATION,
+                        default=user_input.get(
+                            CONF_LOCATION,
+                            {
+                                "latitude": self.hass.config.latitude,
+                                "longitude": self.hass.config.longitude,
+                            },
+                        ),
+                    ): selector({"location": {}}),
                 }
             ),
             errors=errors,
