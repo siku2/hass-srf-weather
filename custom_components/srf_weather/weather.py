@@ -94,7 +94,7 @@ async def get_api_key(hass: HomeAssistantType, data: MutableMapping) -> str:
     return data[ATTR_API_KEY]
 
 
-async def _get(hass, api_data: dict, url: str, **kwargs) -> dict:
+async def _get(hass, api_data: dict, url: str, expected_mime_type: str, **kwargs) -> dict:
     session = async_get_clientsession(hass)
     api_key = await get_api_key(hass, api_data)
     weak_update(
@@ -115,7 +115,7 @@ async def _get(hass, api_data: dict, url: str, **kwargs) -> dict:
                     int(resp.headers.get("x-ratelimit-reset-time", 0)) / 1000
                 ),
             )
-        data = await resp.json(content_type=None)
+        data = await resp.json(content_type=expected_mime_type)
         logger.debug("API Response: %s", data)
         resp.raise_for_status()
 
@@ -124,7 +124,7 @@ async def _get(hass, api_data: dict, url: str, **kwargs) -> dict:
 
 async def get_geolocation_ids(hass, api_data: dict, latitude: float, longitude: float):
     coordinates = {"latitude": latitude, "longitude": longitude}
-    data = await _get(hass, api_data, URL_GEOLOCATION, params=coordinates)
+    data = await _get(hass, api_data, URL_GEOLOCATION, 'application/json', params=coordinates)
     logger.debug(data)
     return data
 
@@ -208,7 +208,7 @@ class SRFWeather(WeatherEntity):
     async def __update(self) -> None:
         url = URL_FORECASTS.format(geolocationId=self._geolocation_id)
         logger.debug("Updating using URL %s", url)
-        data = await _get(self.hass, self._api_data, url)
+        data = await _get(self.hass, self._api_data, url, 'text/html')
 
         logger.debug(data)
 
