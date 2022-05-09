@@ -1,11 +1,12 @@
 {
   "domain": "srf_weather",
   "name": "SRF Weather",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "config_flow": true,
   "requirements": [],
   "dependencies": [],
   "codeowners": [
+    "agners",
     "siku2"
   ]
 }
