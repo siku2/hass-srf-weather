@@ -214,14 +214,15 @@ class SRFWeather(WeatherEntity):
         logger.debug(data)
 
         forecast = []
-        now = datetime.now().astimezone().replace(minute=0, second=0, microsecond=0)
+                #now = datetime.now().astimezone().replace(minute=0, second=0, microsecond=0)
+        now = datetime.now().astimezone()
 
         # The API seems to provides 4 days worth of hourly (aka 60minutes) forcasts
         # and 7 days tripe-hour (aka hourly)/daily forcasts.
 
-        # Get 12h hourly, fill today and the next day with triple-hour and daily
+        # Get 36h hourly, fill today and the next day with triple-hour and daily
         # forcasts for the rest
-        hourly_split = now + timedelta(hours=12)
+        hourly_split = (now + timedelta(hours=36)).astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
         for raw_hour in data["forecast"]["60minutes"]:
             try:
                 fdate, hour = parse_forecast_hour(raw_hour)
@@ -240,7 +241,7 @@ class SRFWeather(WeatherEntity):
 
             forecast.append(hour)
 
-        triple_hour_split = (now + timedelta(days=2)).replace(hour=0)
+        triple_hour_split = (now + timedelta(days=3)).replace(hour=23, minute=59, second=59, microsecond=999)
         for raw_three_hour in data["forecast"]["hour"]:
             try:
                 fdate, three_hour = parse_forecast_hour(raw_three_hour)
