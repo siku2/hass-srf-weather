@@ -140,8 +140,8 @@ class SRFWeather(WeatherEntity):
         self._forecast = []
         self._hourly_forecast = []
         self._state = None
-        self._temperature = None
-        self._wind_speed = None
+        self._native_temperature = None
+        self._native_wind_speed = None
         self._wind_bearing = None
 
         self._state_attrs = {}
@@ -167,15 +167,22 @@ class SRFWeather(WeatherEntity):
         return self._state
 
     @property
-    def temperature(self) -> Optional[float]:
-        return self._temperature
-
+    # def temperature(self) -> Optional[float]:
+    #     return self._native_temperature
+    def native_temperature(self) -> Optional[float]:
+        return self._native_temperature
+        
     @property
-    def temperature_unit(self):
+    # def temperature_unit(self):
+    #     return TEMP_CELSIUS
+    def native_temperature_unit(self):
         return TEMP_CELSIUS
 
+
     @property
-    def pressure(self) -> Optional[float]:
+    # def pressure(self) -> Optional[float]:
+    #     return None
+    def native_pressure(self) -> Optional[float]:
         return None
 
     @property
@@ -183,12 +190,12 @@ class SRFWeather(WeatherEntity):
         return None
 
     @property
-    def visibility(self) -> Optional[float]:
+    def native_visibility(self) -> Optional[float]:
         return None
 
     @property
-    def wind_speed(self) -> Optional[float]:
-        return self._wind_speed
+    def native_wind_speed(self) -> Optional[float]:
+        return self._native_wind_speed
 
     @property
     def wind_bearing(self) -> Optional[str]:
@@ -214,7 +221,7 @@ class SRFWeather(WeatherEntity):
         logger.debug(data)
 
         forecast = []
-                #now = datetime.now().astimezone().replace(minute=0, second=0, microsecond=0)
+        #now = datetime.now().astimezone().replace(minute=0, second=0, microsecond=0)
         now = datetime.now().astimezone()
 
         # The API seems to provides 4 days worth of hourly (aka 60minutes) forcasts
@@ -222,6 +229,7 @@ class SRFWeather(WeatherEntity):
 
         # Get 36h hourly, fill today and the next day with triple-hour and daily
         # forcasts for the rest
+        #hourly_split = now + timedelta(hours=98)
         hourly_split = (now + timedelta(hours=36)).astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
         for raw_hour in data["forecast"]["60minutes"]:
             try:
@@ -282,8 +290,8 @@ class SRFWeather(WeatherEntity):
         logger.debug(forecastnow)
 
         self._state = forecastnow["condition"]
-        self._temperature = forecastnow["temperature"]
-        self._wind_speed = forecastnow["wind_speed"]
+        self._native_temperature = forecastnow["temperature"]
+        self._native_wind_speed = forecastnow["wind_speed"]
         self._wind_bearing = deg_to_cardinal(forecastnow["wind_bearing"])
 
         self._state_attrs.update(
