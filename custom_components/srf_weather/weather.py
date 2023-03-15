@@ -142,6 +142,7 @@ class SRFWeather(WeatherEntity):
         self._state = None
         self._native_temperature = None
         self._native_wind_speed = None
+        self._native_wind_speed_max = None
         self._wind_bearing = None
 
         self._state_attrs = {}
@@ -196,6 +197,10 @@ class SRFWeather(WeatherEntity):
     @property
     def native_wind_speed(self) -> Optional[float]:
         return self._native_wind_speed
+
+    @property
+    def native_wind_speed_amx(self) -> Optional[float]:
+        return self._native_wind_speed_max
 
     @property
     def wind_bearing(self) -> Optional[str]:
@@ -292,6 +297,7 @@ class SRFWeather(WeatherEntity):
         self._state = forecastnow["condition"]
         self._native_temperature = forecastnow["temperature"]
         self._native_wind_speed = forecastnow["wind_speed"]
+        self._native_wind_speed_max = forecastnow["wind_speed_max"]
         self._wind_bearing = deg_to_cardinal(forecastnow["wind_bearing"])
 
         self._state_attrs.update(
@@ -318,6 +324,7 @@ def parse_forecast(forecast: dict) -> Tuple[datetime, dict]:
     condition = get_condition_from_symbol(symbol_id)
     precip_total = float(forecast["RRR_MM"])
     wind_speed = float(forecast["FF_KMH"])
+    wind_speed_max = float(forecast["FX_KMH"])
     percip_probability = float(forecast["PROBPCP_PERCENT"])
 
     data = {
@@ -326,6 +333,7 @@ def parse_forecast(forecast: dict) -> Tuple[datetime, dict]:
         "symbol_id": symbol_id,
         "precipitation": precip_total,
         "wind_speed": wind_speed,
+        "wind_speed_max": wind_speed_max,
         "precipitation_probability": percip_probability,
     }
 
