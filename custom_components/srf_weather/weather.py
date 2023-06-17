@@ -144,7 +144,11 @@ class SRFWeather(WeatherEntity):
         self._native_wind_speed = None
         self._native_wind_speed_max = None
         self._wind_bearing = None
-
+        self._native_pressure = None
+        self._humidity = None
+        self._fresh_snow = None
+        self._irradiance = None
+        
         self._state_attrs = {}
 
     @property
@@ -199,12 +203,20 @@ class SRFWeather(WeatherEntity):
         return self._native_wind_speed
 
     @property
-    def native_wind_speed_amx(self) -> Optional[float]:
+    def native_wind_speed_max(self) -> Optional[float]:
         return self._native_wind_speed_max
 
     @property
     def wind_bearing(self) -> Optional[str]:
         return self._wind_bearing
+
+    @property
+    def fresh_snow(self) -> Optional[str]:
+        return self._fresh_snow
+
+    @property
+    def irradiance(self) -> Optional[str]:
+        return self._irradiance
 
     @property
     def forecast(self) -> List[dict]:
@@ -299,12 +311,16 @@ class SRFWeather(WeatherEntity):
         self._native_wind_speed = forecastnow["wind_speed"]
         self._native_wind_speed_max = forecastnow["wind_speed_max"]
         self._wind_bearing = deg_to_cardinal(forecastnow["wind_bearing"])
+        self._native_pressure = forecastnow["pressure"]
+        self._humidity = forecastnow["humidity"]
 
         self._state_attrs.update(
             wind_direction=forecastnow["wind_bearing"],
             symbol_id=forecastnow["symbol_id"],
             precipitation=forecastnow["precipitation"],
             precipitation_probability=forecastnow["precipitation_probability"],
+            fresh_snow = forecastnow["fresh_snow"],
+            irradiance = forecastnow["irradiance"]
         )
 
     async def async_update(self) -> None:
@@ -326,6 +342,10 @@ def parse_forecast(forecast: dict) -> Tuple[datetime, dict]:
     wind_speed = float(forecast["FF_KMH"])
     wind_speed_max = float(forecast["FX_KMH"])
     percip_probability = float(forecast["PROBPCP_PERCENT"])
+    pressure = float(forecast["PRESSURE_HPA"])
+    humidity = int(forecast["RELHUM_PERCENT"])
+    fresh_snow = int(forecast["FRESHSNOW_CM"])
+    irradiance = float(forecast["IRRADIANCE_WM2"])
 
     data = {
         "datetime": date.isoformat(),
@@ -335,6 +355,10 @@ def parse_forecast(forecast: dict) -> Tuple[datetime, dict]:
         "wind_speed": wind_speed,
         "wind_speed_max": wind_speed_max,
         "precipitation_probability": percip_probability,
+        "pressure": pressure,
+        "humidity": humidity,
+        "fresh_snow": fresh_snow,
+        "irradiance": irradiance,
     }
 
     # For some unknown reason, wind bearing is sometimes missing
