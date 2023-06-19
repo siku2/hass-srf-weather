@@ -342,10 +342,6 @@ def parse_forecast(forecast: dict) -> Tuple[datetime, dict]:
     wind_speed = float(forecast["FF_KMH"])
     wind_speed_max = float(forecast["FX_KMH"])
     percip_probability = float(forecast["PROBPCP_PERCENT"])
-    pressure = float(forecast["PRESSURE_HPA"])
-    humidity = int(forecast["RELHUM_PERCENT"])
-    fresh_snow = int(forecast["FRESHSNOW_CM"])
-    irradiance = float(forecast["IRRADIANCE_WM2"])
 
     data = {
         "datetime": date.isoformat(),
@@ -355,15 +351,22 @@ def parse_forecast(forecast: dict) -> Tuple[datetime, dict]:
         "wind_speed": wind_speed,
         "wind_speed_max": wind_speed_max,
         "precipitation_probability": percip_probability,
-        "pressure": pressure,
-        "humidity": humidity,
-        "fresh_snow": fresh_snow,
-        "irradiance": irradiance,
     }
 
     # For some unknown reason, wind bearing is sometimes missing
     if "DD_DEG" in forecast:
         data["wind_bearing"] = int(forecast["DD_DEG"])
+
+    #same with PRESSURE_HPA, RELHUM_PERCENT, FRESHSNOW_CM and IRRADIANCE_WM2
+    #seems to be linked to type of forecasts 1h, 3h, daily... which determines if other attributes are provided or not
+    if "PRESSURE_HPA" in forecast:
+        data["pressure"] = int(forecast["PRESSURE_HPA"])
+    if "RELHUM_PERCENT" in forecast:
+        data["humidity"] = int(forecast["RELHUM_PERCENT"])
+    if "FRESHSNOW_CM" in forecast:
+        data["fresh_snow"] = int(forecast["FRESHSNOW_CM"])
+    if "IRRADIANCE_WM2" in forecast:
+        data["irradiance"] = int(forecast["IRRADIANCE_WM2"])
 
     return (date, data)
 
