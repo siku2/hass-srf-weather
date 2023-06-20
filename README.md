@@ -20,5 +20,5 @@ readd the "SRF Weather" integration.
 
 ## Limitations
 
-- The SRG SSR Weather API doesn't report humidity and air pressure.
+- The SRG SSR Weather API now reports humidity, air pressure, irradiance, and fresh snow for 1h and 3h forecasts, plus .
 - The freemium tier is limited to 50 requests per day (including geo location requests) 
