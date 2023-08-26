@@ -1,12 +1,19 @@
 {
   "domain": "srf_weather",
   "name": "SRF Weather",
-  "version": "2.1.0",
-  "config_flow": true,
-  "requirements": [],
-  "dependencies": [],
+  "after_dependencies": [],
   "codeowners": [
-    "agners",
-    "siku2"
-  ]
+    "@siku2"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/siku2/hass-srf-weather",
+  "homekit": {},
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/siku2/hass-srf-weather/issues",
+  "mqtt": [],
+  "requirements": [],
+  "ssdp": [],
+  "version": "0.0.0",
+  "zeroconf": []
 }

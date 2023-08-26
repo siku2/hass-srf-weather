@@ -1,24 +1,32 @@
-# Home Assistant SRF Weather integration
+# SRF Weather Home Assistant Integration
 
-Brings [SRF Meteo](https://www.srf.ch/meteo) weather forecasts to your Home Assistant.
+[![GitHub Release](https://img.shields.io/github/release/siku2/hass-srf-weather.svg?style=for-the-badge)](https://github.com/siku2/hass-srf-weather/releases)
+[![GitHub Activity](https://img.shields.io/github/commit-activity/y/siku2/hass-srf-weather.svg?style=for-the-badge)](https://github.com/siku2/hass-srf-weather/commits/main)
+[![License](https://img.shields.io/github/license/siku2/hass-srf-weather.svg?style=for-the-badge)](LICENSE)
 
-This integration uses the SRF Weather API provided by SRG SSR. The SRG SSR APIs
-require an API key. You can create your personal API key by registering a
-developer account. Follow the installation instructions shown in HACS or read
-the [info](info.md) file directly.
+[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://hacs.xyz/docs/faq/custom_repositories)
 
-Note: With version 2.0 this integration makes use of the new "SRF Weather" API.
-For this reason the integration has been renamed. If you have been using
-previous version of this integration, you need to remove the integration and
-readd the "SRF Weather" integration.
+[![GitLocalize](https://gitlocalize.com/repo/$GIT_LOCALIZE_PROJECT/whole_project/badge.svg)](https://gitlocalize.com/repo/$GIT_LOCALIZE_PROJECT/whole_project?utm_source=badge)
 
-## Installation with HACS
+_Brings [SRF Meteo](https://www.srf.ch/meteo) weather forecasts to your Home Assistant._
 
-1. Go to the HACS Settings and add the custom repository `siku2/hass-srf-weather` with category "Integration".
-2. Open the "Integrations" tab and search for "SRG SSR Weather".
-3. Follow the instructions there to set the integration up.
+## Installation
 
-## Limitations
+1. Add this repository as a custom repository to HACS: [![Add Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=siku2&repository=hass-srf-weather&category=integration)
+2. Use HACS to install the integration.
+3. Restart Home Assistant.
+4. Set up the integration using the UI: [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=srf_weather)
 
-- The SRG SSR Weather API now reports humidity, air pressure, irradiance, and fresh snow for 1h and 3h forecasts, plus .
-- The freemium tier is limited to 50 requests per day (including geo location requests) 
+## Contributions are welcome
+
+If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
+
+### Providing translations for other languages
+
+If you would like to use the integration in another language, you can help out by providing the necessary translations.
+
+[Head over to **GitLocalize** to start translating.](https://gitlocalize.com/repo/$GIT_LOCALIZE_PROJECT)
+
+If your desired language isn't available there, just open an issue to request it.
+
+You can also just do the translations manually in [custom_components/srf_weather/translations/](./custom_components/srf_weather/translations/) and open a pull request with the changes.

@@ -1,0 +1,8 @@
+{
+    "name": "SRF Weather",
+    "filename": "srf_weather.zip",
+    "hide_default_branch": true,
+    "homeassistant": "2023.8.2",
+    "render_readme": true,
+    "zip_release": true
+}
