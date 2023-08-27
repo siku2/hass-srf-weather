@@ -6,7 +6,7 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://hacs.xyz/docs/faq/custom_repositories)
 
-[![GitLocalize](https://gitlocalize.com/repo/$GIT_LOCALIZE_PROJECT/whole_project/badge.svg)](https://gitlocalize.com/repo/$GIT_LOCALIZE_PROJECT/whole_project?utm_source=badge)
+[![GitLocalize](https://gitlocalize.com/repo/8877/whole_project/badge.svg)](https://gitlocalize.com/repo/8877/whole_project?utm_source=badge)
 
 _Brings [SRF Meteo](https://www.srf.ch/meteo) weather forecasts to your Home Assistant._
 
@@ -25,7 +25,7 @@ If you want to contribute to this please read the [Contribution guidelines](CONT
 
 If you would like to use the integration in another language, you can help out by providing the necessary translations.
 
-[Head over to **GitLocalize** to start translating.](https://gitlocalize.com/repo/$GIT_LOCALIZE_PROJECT)
+[Head over to **GitLocalize** to start translating.](https://gitlocalize.com/repo/8877)
 
 If your desired language isn't available there, just open an issue to request it.
 
