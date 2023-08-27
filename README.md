@@ -17,6 +17,17 @@ _Brings [SRF Meteo](https://www.srf.ch/meteo) weather forecasts to your Home Ass
 3. Restart Home Assistant.
 4. Set up the integration using the UI: [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=srf_weather)
 
+### How to get the API Credentials
+
+Go to <https://developer.srgssr.ch> and create a new account (or log in with your existing one).
+
+Open [Apps](https://developer.srgssr.ch/user/apps) and press the "ADD APP" button.
+
+Give the app a name like "Home Assistant" (the name is irrelevant).
+Make sure that the Product is set to a SRF-MeteoProduct, e.g. "SRF-MeteoProductFreemium".
+
+Open the app you just created and find the "Consumer Key" and "Consumer Secret" in the "Credential" section.
+
 ## Contributions are welcome
 
 If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
