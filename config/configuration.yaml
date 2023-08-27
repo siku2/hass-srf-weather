@@ -5,4 +5,5 @@ default_config:
 logger:
   default: info
   logs:
+    aiohttp: debug
     custom_components.srf_weather: debug

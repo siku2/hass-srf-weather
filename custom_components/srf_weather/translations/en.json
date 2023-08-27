@@ -1,19 +1,11 @@
 {
   "config": {
     "error": {
-      "geolocation_exists": "Location exists already",
+      "geolocation_exists": "Location already exists",
       "invalid_credentials": "Invalid credentials",
       "no_geolocation_found": "No geolocation found"
     },
     "step": {
-      "location": {
-        "data": {
-          "location": "Location",
-          "name": "Name"
-        },
-        "description": "Location to provide weather for",
-        "title": "Location"
-      },
       "credentials": {
         "data": {
           "consumer_key": "Consumer Key",
@@ -22,12 +14,30 @@
         "description": "Please provide the app credentials from https://developer.srgssr.ch/user/me/apps",
         "title": "API Setup"
       },
-      "geolocationid": {
+      "search_menu": {
+        "menu_options": {
+          "search_ha_home": "Use Home Assistant Home",
+          "search_zip": "ZIP Code"
+        },
+        "description": "How to search for location?",
+        "title": "Location Search"
+      },
+      "search_ha_home": {
+        "title": "Location Search"
+      },
+      "search_zip": {
+        "data": {
+          "zip": "ZIP Code"
+        },
+        "description": "Enter the ZIP Code to search",
+        "title": "Location Search"
+      },
+      "choose_geolocation": {
         "data": {
           "geolocation_id": "Location"
         },
-        "description": "Closest available weather locations",
-        "title": "Location choice"
+        "description": "Choose your location from the available weather locations",
+        "title": "Location Choice"
       }
     },
     "title": "SRF Weather"
