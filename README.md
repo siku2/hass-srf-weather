@@ -28,6 +28,10 @@ Make sure that the Product is set to a SRF-MeteoProduct, e.g. "SRF-MeteoProductF
 
 Open the app you just created and find the "Consumer Key" and "Consumer Secret" in the "Credential" section.
 
+> [!NOTE]
+> The basic "freemium" tier only allows you to use a single location.
+> If you add multiple locations in HA, the integration will break.
+
 ## Contributions are welcome
 
 If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
