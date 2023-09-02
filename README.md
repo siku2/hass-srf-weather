@@ -6,7 +6,7 @@
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://hacs.xyz/docs/faq/custom_repositories)
 
-[![GitLocalize](https://gitlocalize.com/repo/8877/whole_project/badge.svg)](https://gitlocalize.com/repo/8877/whole_project?utm_source=badge)
+[![GitLocalize](https://gitlocalize.com/repo/8877/whole_project/badge.svg)](https://gitlocalize.com/repo/8877)
 
 _Brings [SRF Meteo](https://www.srf.ch/meteo) weather forecasts to your Home Assistant._
 
