@@ -2,6 +2,7 @@
   "config": {
     "error": {
       "geolocation_exists": "Location already exists",
+      "home_not_found": "No locations found for your home. Please manually search for the location",
       "invalid_credentials": "Invalid credentials",
       "no_geolocation_found": "No geolocation found"
     },

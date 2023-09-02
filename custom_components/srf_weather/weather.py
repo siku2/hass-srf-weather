@@ -1,6 +1,7 @@
 import dataclasses
 import logging
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterable, Iterator
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.components.weather import (
@@ -37,10 +38,48 @@ from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from . import api
 from .const import CONF_GEOLOCATION_ID
 from .coordinator import Coordinator, get_coordinator
+from .helpers import get_geolocation_description
 
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(minutes=15)
+
+# you can download the icon set here: https://developer.srgssr.ch/api-catalog/srf-weather/srf-weather-description
+ICON_CONDITION_MAP: dict[str, list[int]] = {
+    ATTR_CONDITION_CLEAR_NIGHT: [-1],
+    ATTR_CONDITION_CLOUDY: [18, 19],
+    ATTR_CONDITION_EXCEPTIONAL: [],
+    ATTR_CONDITION_FOG: [2, 17],
+    ATTR_CONDITION_HAIL: [],
+    ATTR_CONDITION_LIGHTNING_RAINY: [
+        5,
+        12,
+        26,
+        # these have snow (or hail?) in them as well
+        9,
+        16,
+        30,
+    ],
+    ATTR_CONDITION_LIGHTNING: [],
+    ATTR_CONDITION_PARTLYCLOUDY: [3, 10],
+    ATTR_CONDITION_POURING: [23],
+    ATTR_CONDITION_RAINY: [4, 11, 20, 25],
+    ATTR_CONDITION_SNOWY_RAINY: [8, 15, 22, 29],
+    ATTR_CONDITION_SNOWY: [
+        6,
+        13,
+        21,
+        24,
+        27,
+        # the following ones are more like "lightning snowy", but that doesn't exist
+        5,
+        12,
+        26,
+    ],
+    ATTR_CONDITION_SUNNY: [1],
+    ATTR_CONDITION_WINDY_VARIANT: [],
+    ATTR_CONDITION_WINDY: [],
+}
 
 
 async def async_setup_entry(
@@ -55,7 +94,6 @@ async def async_setup_entry(
         [
             SrfWeather(coordinator, geolocation_id=geolocation_id),
         ],
-        update_before_add=True,
     )
 
 
@@ -78,10 +116,12 @@ class SrfWeather(WeatherEntity, RestoreEntity):
         self.geolocation_id = geolocation_id
 
         self._attr_unique_id = geolocation_id
-        self._attr_name = "HALP"
+        self._attr_name = None  # determined by data
 
         self._srf_data: SrfForecastData | None = None
         self._next_update_at: datetime | None = None
+
+        self._set_forecast_now({})
 
     @property
     def extra_restore_state_data(self) -> ExtraStoredData | None:
@@ -89,34 +129,7 @@ class SrfWeather(WeatherEntity, RestoreEntity):
             return None
         return self._srf_data
 
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        self.coordinator.consumers += 1
-
-        if last_extra_data := await self.async_get_last_extra_data():
-            self._srf_data = SrfForecastData.from_dict(last_extra_data.as_dict())
-
-    async def async_will_remove_from_hass(self) -> None:
-        await super().async_will_remove_from_hass()
-        self.coordinator.consumers -= 1
-
-    async def async_update(self) -> None:
-        now = datetime.now(tz=timezone.utc)
-        should_update = self._srf_data is None
-        should_update |= self._next_update_at is None or now >= self._next_update_at
-        if should_update:
-            forecast_week = (
-                await self.coordinator.client.get_forecast_week_by_geo_location(
-                    self.geolocation_id
-                )
-            )
-            self._srf_data = SrfForecastData.create_from_api(forecast_week)
-            self._next_update_at = self.coordinator.request_next_api_call()
-            _LOGGER.debug("data updated, next update at %s", self._next_update_at)
-
-        assert self._srf_data  # is always set here
-
-        forecast_now = self._srf_data.get_forecast(now) or {}
+    def _set_forecast_now(self, forecast_now: Forecast | dict[str, Any]) -> None:
         self._attr_condition = forecast_now.get("condition")
         self._attr_humidity = forecast_now.get("humidity")
         self._attr_native_apparent_temperature = forecast_now.get(
@@ -130,6 +143,45 @@ class SrfWeather(WeatherEntity, RestoreEntity):
         self._attr_uv_index = forecast_now.get("uv_index")
         self._attr_wind_bearing = forecast_now.get("wind_bearing")
 
+    def _set_srf_data(self, data: "SrfForecastData") -> None:
+        self._srf_data = data
+        self._next_update_at = self.coordinator.request_next_api_call()
+        _LOGGER.debug("data updated, next update at %s", self._next_update_at)
+
+        now = datetime.now(tz=timezone.utc)
+        self._set_forecast_now(self._srf_data.get_forecast(now) or {})
+        self._attr_name = data.name
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.coordinator.consumers += 1
+
+        if last_extra_data := await self.async_get_last_extra_data():
+            self._set_srf_data(SrfForecastData.from_dict(last_extra_data.as_dict()))
+            _LOGGER.debug("restored srf data")
+        self.async_schedule_update_ha_state(True)
+
+    async def async_will_remove_from_hass(self) -> None:
+        await super().async_will_remove_from_hass()
+        self.coordinator.consumers -= 1
+
+    async def async_update(self) -> None:
+        now = datetime.now(tz=timezone.utc)
+        should_update = self._srf_data is None
+        should_update |= self._next_update_at is None or now >= self._next_update_at
+        if should_update:
+            _LOGGER.info("updating forecast from api")
+            forecast_week = (
+                await self.coordinator.client.get_forecast_week_by_geo_location(
+                    self.geolocation_id
+                )
+            )
+            self._set_srf_data(SrfForecastData.create_from_api(forecast_week))
+            return
+
+        assert self._srf_data  # is always set here
+        self._set_forecast_now(self._srf_data.get_forecast(now) or {})
+
     @property
     def available(self) -> bool:
         return self._srf_data is not None
@@ -137,16 +189,19 @@ class SrfWeather(WeatherEntity, RestoreEntity):
     async def async_forecast_hourly(self) -> list[Forecast] | None:
         if not self._srf_data:
             return None
-        return self._srf_data.hourly
+        now = datetime.now(tz=timezone.utc)
+        return list(self._srf_data.iter_hourly(now))
 
     async def async_forecast_daily(self) -> list[Forecast] | None:
         if not self._srf_data:
             return None
-        return self._srf_data.daily
+        now = datetime.now(tz=timezone.utc)
+        return list(self._srf_data.iter_daily(now))
 
 
 @dataclasses.dataclass(slots=True, kw_only=True)
 class SrfForecastData(ExtraStoredData):
+    name: str
     hourly: list[Forecast]
     daily: list[Forecast]
 
@@ -158,28 +213,66 @@ class SrfForecastData(ExtraStoredData):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SrfForecastData":
-        return SrfForecastData(hourly=data["hourly"], daily=data["daily"])
+        return SrfForecastData(
+            name=data.get("name", ""), hourly=data["hourly"], daily=data["daily"]
+        )
 
     @classmethod
     def create_from_api(cls, forecast_week: api.ForecastPointWeek) -> "SrfForecastData":
-        # TODO: determine uv index for hourly
+        uvi_by_date = _build_uvi_by_date(forecast_week["days"])
         hourly = [
-            forecast_from_hourly(forecast, uv_index=None)
+            forecast_from_hourly(
+                forecast,
+                uv_index=_get_uvi_for_hourly(uvi_by_date, forecast["date_time"]),
+            )
             for forecast in forecast_week["hours"]
         ]
         hourly.extend(
-            forecast_from_hourly(forecast, uv_index=None)
+            forecast_from_hourly(
+                forecast,
+                uv_index=_get_uvi_for_hourly(uvi_by_date, forecast["date_time"]),
+            )
             for forecast in forecast_week["three_hours"]
         )
         daily = [forecast_from_daily(forecast) for forecast in forecast_week["days"]]
-        return SrfForecastData(hourly=hourly, daily=daily)
+        name = get_geolocation_description(forecast_week["geolocation"])
+        return SrfForecastData(name=name, hourly=hourly, daily=daily)
 
     def get_forecast(self, ts: datetime) -> Forecast | None:
-        for forecast in self.hourly:
+        return next(self.iter_hourly(ts), None)
+
+    def iter_hourly(self, ts: datetime) -> Iterator[Forecast]:
+        return self._iter_forecasts(self.hourly, ts)
+
+    def iter_daily(self, ts: datetime) -> Iterator[Forecast]:
+        return self._iter_forecasts(self.daily, ts)
+
+    def _iter_forecasts(
+        self, forecasts: Iterable[Forecast], ts: datetime
+    ) -> Iterator[Forecast]:
+        it = iter(forecasts)
+        for forecast in it:
             ends_at = datetime.fromisoformat(forecast["datetime"])
             if ts < ends_at:
-                return forecast
-        return None
+                yield forecast
+                # once we've found the first valid forecast, the rest of them HAVE to be valid
+                break
+        yield from it
+
+
+def _build_uvi_by_date(days: list[api.DayForecastInterval]) -> dict[date, float | None]:
+    mapping: dict[date, float | None] = {}
+    for day in days:
+        dt = datetime.fromisoformat(day["date_time"])
+        mapping[dt.date()] = day.get("UVI")
+    return mapping
+
+
+def _get_uvi_for_hourly(
+    uvi_by_date: dict[date, float | None], date_time: str
+) -> float | None:
+    dt = datetime.fromisoformat(date_time)
+    return uvi_by_date.get(dt.date())
 
 
 def forecast_from_hourly(
@@ -214,7 +307,7 @@ def forecast_from_daily(forecast: api.DayForecastInterval) -> Forecast:
         cloud_coverage=None,
         native_precipitation=forecast["RRR_MM"],
         native_pressure=None,
-        native_temperature=None,
+        native_temperature=forecast["TX_C"],  # this is technically the max temperature
         native_templow=forecast["TN_C"],
         native_apparent_temperature=None,
         wind_bearing=forecast["DD_DEG"],
@@ -226,5 +319,16 @@ def forecast_from_daily(forecast: api.DayForecastInterval) -> Forecast:
     )
 
 
-def condition_from_forecast(forecast: api.ForecastABC) -> str:
-    return "cloudy"  # TODO
+_INV_ICON2COND = {
+    icon: condition for condition, icons in ICON_CONDITION_MAP.items() for icon in icons
+}
+
+
+def condition_from_forecast(forecast: api.ForecastABC) -> str | None:
+    icon = forecast["symbol_code"]
+    try:
+        return _INV_ICON2COND[icon]
+    except KeyError:
+        pass
+    # invert day / night (night icons are negative) and try to look up that
+    return _INV_ICON2COND.get(-icon)

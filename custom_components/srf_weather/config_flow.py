@@ -22,6 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 ERROR_INVALID_CREDENTIALS = "invalid_credentials"
 ERROR_NO_GEOLOCATION_FOUND = "no_geolocation_found"
 ERROR_GEOLOCATION_EXISTS = "geolocation_exists"
+ERROR_HOME_NOT_FOUND = "home_not_found"
 
 CONF_ZIP_CODE = "zip_code"
 
@@ -127,13 +128,15 @@ class SrfMeteoConfigFlow(ConfigFlow, domain=DOMAIN):
         assert self._coordinator  # step 1 will set the client
 
         errors: dict[str, str] = {}
-        # TODO: set special error if ha_home_not_found is True
+        if ha_home_not_found:
+            errors[CONF_BASE] = ERROR_HOME_NOT_FOUND
 
         if user_input is not None:
             zip_code = user_input[CONF_ZIP_CODE]
             try:
                 results = await self._coordinator.client.search_geolocation(
-                    zip=zip_code
+                    zip=zip_code,
+                    limit=30,
                 )
             except Exception as exc:
                 _LOGGER.warn(
