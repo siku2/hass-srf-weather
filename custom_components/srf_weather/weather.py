@@ -2,7 +2,7 @@ import dataclasses
 import logging
 from collections.abc import Iterable, Iterator
 from datetime import date, datetime, timedelta, timezone
-from typing import Any
+from typing import Any, TypedDict
 
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
@@ -143,6 +143,14 @@ class SrfWeather(WeatherEntity, RestoreEntity):
         self._attr_uv_index = forecast_now.get("uv_index")
         self._attr_wind_bearing = forecast_now.get("wind_bearing")
 
+        self._attr_extra_state_attributes = {}
+        for key in (
+            ForecastSrfExtra.__required_keys__ | ForecastSrfExtra.__optional_keys__
+        ):
+            value = forecast_now.get(key)
+            if value is not None:
+                self._attr_extra_state_attributes[key] = value
+
     def _set_srf_data(self, data: "SrfForecastData") -> None:
         self._srf_data = data
         self._next_update_at = self.coordinator.request_next_api_call()
@@ -199,11 +207,32 @@ class SrfWeather(WeatherEntity, RestoreEntity):
         return list(self._srf_data.iter_daily(now))
 
 
+class ForecastSrfExtra(TypedDict, total=False):
+    symbol_code: int | None
+    symbol24_code: int | None
+
+    # for daily forecast
+    sunrise: str | None
+    sunset: str | None
+    sunshine_hours: int | None
+
+    # hourly forecast
+    temphigh: float | None
+    fresh_snow_cm: int | None
+    sunshine_minutes: int | None
+    irradiance: int | None
+    color: api.Color | None
+
+
+class ForecastSrf(ForecastSrfExtra, Forecast):
+    ...
+
+
 @dataclasses.dataclass(slots=True, kw_only=True)
 class SrfForecastData(ExtraStoredData):
     name: str
-    hourly: list[Forecast]
-    daily: list[Forecast]
+    hourly: list[ForecastSrf]
+    daily: list[ForecastSrf]
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -238,18 +267,18 @@ class SrfForecastData(ExtraStoredData):
         name = get_geolocation_description(forecast_week["geolocation"])
         return SrfForecastData(name=name, hourly=hourly, daily=daily)
 
-    def get_forecast(self, ts: datetime) -> Forecast | None:
+    def get_forecast(self, ts: datetime) -> ForecastSrf | None:
         return next(self.iter_hourly(ts), None)
 
-    def iter_hourly(self, ts: datetime) -> Iterator[Forecast]:
+    def iter_hourly(self, ts: datetime) -> Iterator[ForecastSrf]:
         return self._iter_forecasts(self.hourly, ts)
 
-    def iter_daily(self, ts: datetime) -> Iterator[Forecast]:
+    def iter_daily(self, ts: datetime) -> Iterator[ForecastSrf]:
         return self._iter_forecasts(self.daily, ts)
 
     def _iter_forecasts(
-        self, forecasts: Iterable[Forecast], ts: datetime
-    ) -> Iterator[Forecast]:
+        self, forecasts: Iterable[ForecastSrf], ts: datetime
+    ) -> Iterator[ForecastSrf]:
         it = iter(forecasts)
         for forecast in it:
             ends_at = datetime.fromisoformat(forecast["datetime"])
@@ -277,8 +306,8 @@ def _get_uvi_for_hourly(
 
 def forecast_from_hourly(
     forecast: api.OneHourForecastInterval, *, uv_index: float | None
-) -> Forecast:
-    return Forecast(
+) -> ForecastSrf:
+    return ForecastSrf(
         condition=condition_from_forecast(forecast),
         datetime=forecast["date_time"],
         humidity=forecast.get("RELHUM_PERCENT"),
@@ -295,11 +324,19 @@ def forecast_from_hourly(
         native_dew_point=forecast.get("DEWPOINT_C"),
         uv_index=uv_index,
         is_daytime=None,
+        # srf extra
+        symbol_code=forecast.get("symbol_code"),
+        symbol24_code=forecast.get("symbol24_code"),
+        temphigh=forecast.get("TTH_C"),
+        fresh_snow_cm=forecast.get("FRESHSNOW_CM"),
+        sunshine_minutes=forecast.get("SUN_MIN"),
+        irradiance=forecast.get("IRRADIANCE_WM2"),
+        color=forecast.get("cur_color"),
     )
 
 
-def forecast_from_daily(forecast: api.DayForecastInterval) -> Forecast:
-    return Forecast(
+def forecast_from_daily(forecast: api.DayForecastInterval) -> ForecastSrf:
+    return ForecastSrf(
         condition=condition_from_forecast(forecast),
         datetime=forecast["date_time"],
         humidity=None,
@@ -316,6 +353,12 @@ def forecast_from_daily(forecast: api.DayForecastInterval) -> Forecast:
         native_dew_point=None,
         uv_index=forecast.get("UVI"),
         is_daytime=None,
+        # srf extra
+        symbol_code=forecast.get("symbol_code"),
+        symbol24_code=forecast.get("symbol24_code"),
+        sunrise=forecast.get("SUNRISE"),
+        sunset=forecast.get("SUNSET"),
+        sunshine_hours=forecast.get("SUN_H"),
     )
 
 
