@@ -10,7 +10,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.core import HomeAssistant
 
 from . import api
 from .coordinator import get_coordinator, Coordinator
@@ -28,7 +28,7 @@ CONF_ZIP_CODE = "zip_code"
 
 
 def has_config_entry_for_geolocation_id(
-    hass: HomeAssistantType, geolocation_id: str
+    hass: HomeAssistant, geolocation_id: str
 ) -> bool:
     for entry in hass.config_entries.async_entries(DOMAIN):
         data = entry.data
